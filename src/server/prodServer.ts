@@ -1,3 +1,5 @@
+import { mqttConfig } from '../config/mqtt';
+import { setupMQTTClient, closeMQTTConnection } from '@/lib/mqtt';
 import { createContext } from '@/trpc/context';
 import { appRouter } from '@/trpc/routers';
 import { applyWSSHandler } from '@trpc/server/adapters/ws';
@@ -21,8 +23,17 @@ void app.prepare().then(() => {
   const wss = new WebSocketServer({ server });
   const handler = applyWSSHandler({ wss, router: appRouter, createContext });
 
+  // Initialize MQTT client if broker is configured
+  if (mqttConfig.broker) {
+    setupMQTTClient(mqttConfig);
+    console.log('MQTT client initialized for broker:', mqttConfig.broker);
+  } else {
+    console.log('MQTT client not initialized - broker not configured');
+  }
+
   process.on('SIGTERM', () => {
     console.log('SIGTERM');
+    closeMQTTConnection();
     handler.broadcastReconnectNotification();
   });
 

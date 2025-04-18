@@ -11,7 +11,6 @@ export const db = drizzle(sqlite, { schema });
 export const runMigrations = () => {
   try {
     migrate(db, { migrationsFolder: './drizzle' });
-    console.log('Migrations applied successfully');
   } catch (error) {
     console.error('Error applying migrations:', error);
   }

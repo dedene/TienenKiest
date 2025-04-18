@@ -5,7 +5,7 @@ import { makeQueryClient } from './query-client';
 import type { AppRouter } from './routers';
 import type { QueryClient } from '@tanstack/react-query';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { httpBatchLink } from '@trpc/client';
+import { createWSClient, httpBatchLink, splitLink, wsLink } from '@trpc/client';
 import { createTRPCReact } from '@trpc/react-query';
 import { useState } from 'react';
 import superjson from 'superjson';
@@ -20,14 +20,21 @@ function getQueryClient() {
   // Browser: use singleton pattern to keep the same query client
   return (clientQueryClientSingleton ??= makeQueryClient());
 }
+
 function getUrl() {
-  const base = (() => {
-    if (typeof window !== 'undefined') return '';
-    if (process.env.VERCEL_URL) return `https://${process.env.VERCEL_URL}`;
-    return 'http://localhost:3000';
-  })();
-  return `${base}/api/trpc`;
+  if (typeof window === 'undefined') {
+    // SSR should use relative url
+    return '/api/trpc';
+  }
+  // browser should use relative url
+  return '/api/trpc';
 }
+
+function getWebSocketUrl() {
+  // On the client, always connect to the local WebSocket server
+  return 'ws://localhost:3001';
+}
+
 export function TRPCProvider(
   props: Readonly<{
     children: React.ReactNode;
@@ -38,16 +45,47 @@ export function TRPCProvider(
   //       suspend because React will throw away the client on the initial
   //       render if it suspends and there is no boundary
   const queryClient = getQueryClient();
-  const [trpcClient] = useState(() =>
-    trpc.createClient({
+  const [trpcClient] = useState(() => {
+    // Don't create a WebSocket connection on the server
+    if (typeof window === 'undefined') {
+      return trpc.createClient({
+        links: [
+          httpBatchLink({
+            transformer: superjson,
+            url: getUrl(),
+          }),
+        ],
+      });
+    }
+
+    // Create WebSocket client
+    const wsClient = createWSClient({
+      url: getWebSocketUrl(),
+    });
+
+    return trpc.createClient({
       links: [
-        httpBatchLink({
-          transformer: superjson,
-          url: getUrl(),
+        // Use splitLink to route requests - subscriptions over WebSocket, all else over HTTP
+        splitLink({
+          condition(op) {
+            // Check if the operation is a subscription
+            return op.type === 'subscription';
+          },
+          // When condition is true, use WebSocket
+          true: wsLink({
+            client: wsClient,
+            transformer: superjson,
+          }),
+          // When condition is false, use HTTP
+          false: httpBatchLink({
+            transformer: superjson,
+            url: getUrl(),
+          }),
         }),
       ],
-    })
-  );
+    });
+  });
+
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>
       <QueryClientProvider client={queryClient}>{props.children}</QueryClientProvider>

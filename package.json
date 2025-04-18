@@ -33,6 +33,7 @@
     "client-only": "^0.0.1",
     "clsx": "^2.1.1",
     "cross-env": "^7.0.3",
+    "dotenv": "^16.5.0",
     "drizzle-orm": "^0.42.0",
     "framer-motion": "^12.7.4",
     "lucide-react": "^0.501.0",

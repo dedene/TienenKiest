@@ -35,8 +35,24 @@ export const QuestionTable = () => {
   } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
 
+  // Local state to track real-time counters
+  const [liveCounters, setLiveCounters] = useState<Record<string, number>>({});
+
   // Fetch questions using tRPC
   const { data: questions, isLoading, error, refetch } = trpc.questions.getAll.useQuery();
+
+  // Subscribe to counter updates
+  trpc.subscriptions.counterUpdates.useSubscription(undefined, {
+    onData: (data) => {
+      setLiveCounters((prev) => ({
+        ...prev,
+        [data.answerId]: data.count,
+      }));
+    },
+    onError: (err) => {
+      console.error('Subscription error:', err);
+    },
+  });
 
   // tRPC mutations
   const toggleActiveMutation = trpc.questions.toggleActive.useMutation({
@@ -111,6 +127,18 @@ export const QuestionTable = () => {
     deleteQuestionMutation.mutate({ id: deletingQuestion.id });
   };
 
+  // Helper function to get the current count for an answer
+  const getAnswerCount = (questionId: string, answerPosition: 1 | 2, defaultCount: number) => {
+    const answerId = `${questionId}_answer${answerPosition}`;
+    // Only use live counters for active questions
+    const activeQuestion = questions?.find((q) => q.id === questionId && q.isActive);
+
+    if (activeQuestion && answerId in liveCounters) {
+      return liveCounters[answerId];
+    }
+    return defaultCount;
+  };
+
   return (
     <div className="space-y-8">
       <div className="flex flex-row items-center justify-between mb-6">
@@ -121,23 +149,6 @@ export const QuestionTable = () => {
           Nieuwe vraag
         </Button>
       </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Live voorbeeld</CardTitle>
-          <CardDescription>Bekijk wat gebruikers zien</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <p className="text-sm text-gray-600 dark:text-gray-400">
-            Bekijk de huidige actieve vraag en opties zoals deze aan gebruikers wordt getoond.
-          </p>
-        </CardContent>
-        <div className="flex justify-end px-6 pb-6">
-          <Button variant="outline" onClick={() => window.open('/', '_blank')}>
-            Open live weergave
-          </Button>
-        </div>
-      </Card>
 
       <Card>
         <CardHeader>
@@ -184,13 +195,17 @@ export const QuestionTable = () => {
                     <TableCell>
                       <div className="flex items-center justify-between">
                         <span>{question.answer1Text}</span>
-                        <Badge>{question.answer1Count}</Badge>
+                        <Badge className={question.isActive ? 'animate-pulse' : ''}>
+                          {getAnswerCount(question.id, 1, question.answer1Count)}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-between">
                         <span>{question.answer2Text}</span>
-                        <Badge>{question.answer2Count}</Badge>
+                        <Badge className={question.isActive ? 'animate-pulse' : ''}>
+                          {getAnswerCount(question.id, 2, question.answer2Count)}
+                        </Badge>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">
@@ -207,7 +222,7 @@ export const QuestionTable = () => {
                         />
                         <IconButton
                           icon={<TrashIcon className="h-4 w-4" />}
-                          variant="destructive"
+                          variant="destructive-outline"
                           onClick={() => handleDelete(question)}
                           aria-label="Verwijder vraag"
                         />
@@ -219,6 +234,23 @@ export const QuestionTable = () => {
             </Table>
           )}
         </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Live voorbeeld</CardTitle>
+          <CardDescription>Bekijk wat gebruikers zien</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Bekijk de huidige actieve vraag en opties zoals deze aan gebruikers wordt getoond.
+          </p>
+        </CardContent>
+        <div className="flex justify-end px-6 pb-6">
+          <Button variant="outline" onClick={() => window.open('/', '_blank')}>
+            Open live weergave
+          </Button>
+        </div>
       </Card>
 
       <QuestionEditor

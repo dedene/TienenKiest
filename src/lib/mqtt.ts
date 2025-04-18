@@ -1,11 +1,11 @@
+import { mqttConfig } from '../config/mqtt';
+import { observableServer } from '../trpc/observable-server';
 import { db } from './db';
 import { questions } from './db/schema';
 import { eq } from 'drizzle-orm';
 import mqtt from 'mqtt';
-import { Server as SocketIOServer } from 'socket.io';
 
 let mqttClient: mqtt.MqttClient | null = null;
-let io: SocketIOServer | null = null;
 
 interface MQTTConfig {
   broker: string;
@@ -15,9 +15,7 @@ interface MQTTConfig {
 }
 
 // Setup MQTT client and listeners
-export function setupMQTTClient(config: MQTTConfig, socketIO: SocketIOServer) {
-  io = socketIO;
-
+export function setupMQTTClient(config: MQTTConfig) {
   const { broker, port, username, password } = config;
   const url = `mqtt://${broker}:${port}`;
 
@@ -73,18 +71,15 @@ export function setupMQTTClient(config: MQTTConfig, socketIO: SocketIOServer) {
 
         await db.update(questions).set(updateData).where(eq(questions.id, activeQuestion.id));
 
-        // Fake answerId to maintain compatibility with client expectations
-        // The client expects an answerId and count format
+        // Create format for counter update event
         const answerId =
           answerPosition === '1' ? `${activeQuestion.id}_answer1` : `${activeQuestion.id}_answer2`;
 
-        if (io) {
-          // Emit updated data to all connected clients
-          io.emit('counter-update', {
-            answerId,
-            count,
-          });
-        }
+        // Emit event through tRPC observable
+        observableServer.counterUpdate.emit('counterUpdate', {
+          answerId,
+          count,
+        });
       } catch (error) {
         console.error('Error processing counter update:', error);
       }
@@ -113,7 +108,7 @@ export function publishMessage(topic: string, message: string) {
 export async function resetCounters() {
   if (!mqttClient) {
     console.error('MQTT client not initialized');
-    return;
+    return false;
   }
 
   try {
@@ -138,17 +133,15 @@ export async function resetCounters() {
       .where(eq(questions.id, activeQuestion.id));
 
     // Publish the reset to MQTT
-    publishMessage(`set_counter/1`, '0');
-    publishMessage(`set_counter/2`, '0');
+    publishMessage(mqttConfig.topics.setCounter1, '0');
+    publishMessage(mqttConfig.topics.setCounter2, '0');
 
-    if (io) {
-      // Emit updated data to all connected clients with the format expected by clients
-      const answer1Id = `${activeQuestion.id}_answer1`;
-      const answer2Id = `${activeQuestion.id}_answer2`;
+    // Emit update through tRPC observable
+    const answer1Id = `${activeQuestion.id}_answer1`;
+    const answer2Id = `${activeQuestion.id}_answer2`;
 
-      io.emit('counter-update', { answerId: answer1Id, count: 0 });
-      io.emit('counter-update', { answerId: answer2Id, count: 0 });
-    }
+    observableServer.counterUpdate.emit('counterUpdate', { answerId: answer1Id, count: 0 });
+    observableServer.counterUpdate.emit('counterUpdate', { answerId: answer2Id, count: 0 });
 
     return true;
   } catch (error) {

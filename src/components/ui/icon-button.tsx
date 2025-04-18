@@ -4,7 +4,14 @@ import { ButtonHTMLAttributes, ReactNode } from 'react';
 
 interface IconButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   icon: ReactNode;
-  variant?: 'default' | 'destructive' | 'outline' | 'secondary' | 'ghost' | 'link';
+  variant?:
+    | 'default'
+    | 'destructive'
+    | 'outline'
+    | 'secondary'
+    | 'ghost'
+    | 'link'
+    | 'destructive-outline';
   size?: 'default' | 'sm' | 'lg' | 'icon';
 }
 

@@ -1,5 +1,6 @@
 import { publicProcedure, createTRPCRouter } from '../init';
 import { questions, NewQuestion } from '@/lib/db/schema';
+import { resetCounters } from '@/lib/mqtt';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -160,4 +161,15 @@ export const questionsRouter = createTRPCRouter({
 
       return updatedQuestion[0];
     }),
+
+  // Reset counters for the active question
+  resetCounters: publicProcedure.mutation(async () => {
+    const result = await resetCounters();
+
+    if (!result) {
+      throw new Error('Failed to reset counters or no active question found');
+    }
+
+    return { success: true };
+  }),
 });
