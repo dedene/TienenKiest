@@ -3,6 +3,7 @@
 import { trpc } from '@/lib/trpc';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
+import GaugeComponent from 'react-gauge-component';
 
 const ArrowDown = () => {
   return (
@@ -19,9 +20,83 @@ const ArrowDown = () => {
   );
 };
 
+// Skeleton component for loading state
+const SkeletonVoteOption = () => {
+  return (
+    <div className="flex-1 flex flex-col items-center p-4 gap-3">
+      <div className="bg-gray-300 rounded-lg w-full h-16 animate-pulse" />
+      <div className="bg-gray-300 rounded-lg w-full h-16 animate-pulse" />
+      <div className="w-full flex justify-center mt-2">
+        <div className="w-full opacity-30">
+          <ArrowDown />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+interface VoteOptionProps {
+  count: number;
+  text: string;
+  isAnimating: boolean;
+  contentVariants: {
+    hidden: { opacity: number };
+    visible: {
+      opacity: number;
+      transition: { duration: number };
+    };
+    exit: {
+      opacity: number;
+      transition: { duration: number };
+    };
+  };
+  color: string;
+}
+
+const VoteOption = ({ count, text, isAnimating, contentVariants }: VoteOptionProps) => {
+  return (
+    <div className="flex-1 flex flex-col items-center p-4 gap-3">
+      <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={`count-${count}`}
+            className="text-5xl md:text-6xl font-bold text-gray-700"
+            variants={contentVariants}
+            initial="hidden"
+            animate={isAnimating ? 'exit' : 'visible'}
+            exit="exit"
+          >
+            {count}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+      <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+        <AnimatePresence mode="wait">
+          <motion.span
+            key={`text-${text}`}
+            className="text-5xl md:text-6xl font-bold text-gray-700"
+            variants={contentVariants}
+            initial="hidden"
+            animate={isAnimating ? 'exit' : 'visible'}
+            exit="exit"
+          >
+            {text}
+          </motion.span>
+        </AnimatePresence>
+      </div>
+      <div className="w-full flex justify-center mt-2">
+        <div className="w-full">
+          <ArrowDown />
+        </div>
+      </div>
+    </div>
+  );
+};
+
 export default function Home() {
   // Keep track of last data update time
   const lastUpdateTimeRef = useRef<number>(Date.now());
+  const [isLoading, setIsLoading] = useState(true);
 
   // Create a direct query to fetch active question (for fallback)
   const { data: activeQuestionQueryData, refetch: refetchQuestion } =
@@ -32,13 +107,22 @@ export default function Home() {
       }
     );
 
+  // Set loading state when data is received
+  useEffect(() => {
+    if (activeQuestionQueryData) {
+      setIsLoading(false);
+    }
+  }, [activeQuestionQueryData]);
+
   // State for displayed data
-  const [displayedQuestion, setDisplayedQuestion] = useState('Laden...');
-  const [answer1Text, setAnswer1Text] = useState('JA');
+  const [displayedQuestion, setDisplayedQuestion] = useState('');
+  const [answer1Text, setAnswer1Text] = useState('');
   const [answer1Count, setAnswer1Count] = useState(0);
-  const [answer2Text, setAnswer2Text] = useState('NEEN');
+  const [answer1Color, setAnswer1Color] = useState('');
+  const [answer2Text, setAnswer2Text] = useState('');
   const [answer2Count, setAnswer2Count] = useState(0);
-  const [needleRotation, setNeedleRotation] = useState(0);
+  const [answer2Color, setAnswer2Color] = useState('');
+  const [gaugeValue, setGaugeValue] = useState(50); // For the gauge component
 
   // State for tracking question changes
   const [lastQuestionId, setLastQuestionId] = useState<string | null>(null);
@@ -67,6 +151,11 @@ export default function Home() {
       console.log('Received active question data:', data);
       lastUpdateTimeRef.current = Date.now();
 
+      // Mark as not loading once we have data
+      if (isLoading) {
+        setIsLoading(false);
+      }
+
       // If the question ID has changed, trigger transition effect
       if (lastQuestionId && lastQuestionId !== data.id) {
         console.log('Question changed from', lastQuestionId, 'to', data.id);
@@ -77,10 +166,26 @@ export default function Home() {
         });
 
         setIsAnimating(true);
-        updateDisplayedData(data);
+        updateDisplayedData({
+          question: data.question,
+          answer1Text: data.answer1Text,
+          answer1Count: data.answer1Count,
+          answer1Color: data.answer1Color,
+          answer2Text: data.answer2Text,
+          answer2Count: data.answer2Count,
+          answer2Color: data.answer2Color,
+        });
       } else {
         // If it's just a counter update or the first load, update immediately
-        updateDisplayedData(data);
+        updateDisplayedData({
+          question: data.question,
+          answer1Text: data.answer1Text,
+          answer1Count: data.answer1Count,
+          answer1Color: data.answer1Color,
+          answer2Text: data.answer2Text,
+          answer2Count: data.answer2Count,
+          answer2Color: data.answer2Color,
+        });
       }
 
       // Store the current question ID for comparing on next update
@@ -96,20 +201,47 @@ export default function Home() {
     question: string;
     answer1Text: string;
     answer1Count: number;
+    answer1Color?: string; // Make optional since it might not be in the subscription data
     answer2Text: string;
     answer2Count: number;
+    answer2Color?: string; // Make optional since it might not be in the subscription data
   }) => {
     setDisplayedQuestion(data.question);
     setAnswer1Text(data.answer1Text);
     setAnswer1Count(data.answer1Count);
+    if (data.answer1Color) setAnswer1Color(data.answer1Color);
     setAnswer2Text(data.answer2Text);
     setAnswer2Count(data.answer2Count);
+    if (data.answer2Color) setAnswer2Color(data.answer2Color);
 
-    // Calculate gauge needle position - FLIPPED to show answer2Count on left, answer1Count on right
+    // Calculate gauge value (0-100 scale)
+    // Using a non-linear function to make small differences less pronounced
     const total = data.answer1Count + data.answer2Count;
-    const ratio = total > 0 ? data.answer2Count / total : 0.5; // Flipped from answer1Count to answer2Count
-    const degrees = ratio * 180 - 90; // Maps from 0 to 180 degrees, centered at -90
-    setNeedleRotation(degrees);
+
+    // Default to center if no votes
+    if (total === 0) {
+      setGaugeValue(50);
+    } else {
+      // Apply a sigmoid-like function to make small differences less pronounced
+      // and large differences more pronounced
+      // This function will:
+      // - Keep values closer to 50% when vote counts are small or differences are small
+      // - Move more dramatically toward extremes as total votes or differences increase
+
+      // Calculate normalized vote difference (-1 to 1 range)
+      const difference = (data.answer2Count - data.answer1Count) / total;
+
+      // Apply scaling based on total votes (smaller effect with fewer votes)
+      const voteScalingFactor = Math.min(1, Math.log10(total + 1) / 2);
+
+      // Calculate dampened difference
+      const dampedDifference = difference * voteScalingFactor;
+
+      // Convert to gauge value (0-100 range)
+      const adjustedValue = 50 + dampedDifference * 50;
+
+      setGaugeValue(adjustedValue);
+    }
   };
 
   // Set initial data from query
@@ -129,8 +261,10 @@ export default function Home() {
             question: question.text,
             answer1Text: question.answer1Text,
             answer1Count: question.answer1Count,
+            answer1Color: question.answer1Color,
             answer2Text: question.answer2Text,
             answer2Count: question.answer2Count,
+            answer2Color: question.answer2Color,
           });
           setLastQuestionId(question.id);
         } else {
@@ -139,8 +273,10 @@ export default function Home() {
             question: question.text,
             answer1Text: question.answer1Text,
             answer1Count: question.answer1Count,
+            answer1Color: question.answer1Color,
             answer2Text: question.answer2Text,
             answer2Count: question.answer2Count,
+            answer2Color: question.answer2Color,
           });
           setLastQuestionId(question.id);
         }
@@ -150,8 +286,10 @@ export default function Home() {
           question: question.text,
           answer1Text: question.answer1Text,
           answer1Count: question.answer1Count,
+          answer1Color: question.answer1Color,
           answer2Text: question.answer2Text,
           answer2Count: question.answer2Count,
+          answer2Color: question.answer2Color,
         });
       }
     }
@@ -175,44 +313,6 @@ export default function Home() {
   // Animation complete handler
   const handleAnimationComplete = () => {
     setIsAnimating(false);
-  };
-
-  // Format the question for display with line breaks at appropriate points
-  const formatQuestion = () => {
-    if (!displayedQuestion) return 'Laden...';
-
-    // If question already has line breaks, respect them
-    if (displayedQuestion.includes('\n')) {
-      return displayedQuestion.split('\n').map((line, i) => (
-        <span key={i}>
-          {line}
-          {i < displayedQuestion.split('\n').length - 1 && <br />}
-        </span>
-      ));
-    }
-
-    // For a question without breaks, split it into approximately equal parts
-    const words = displayedQuestion.split(' ');
-
-    if (words.length <= 6) {
-      return displayedQuestion; // Short questions don't need breaks
-    }
-
-    const thirdOfWords = Math.ceil(words.length / 3);
-
-    const firstPart = words.slice(0, thirdOfWords).join(' ');
-    const secondPart = words.slice(thirdOfWords, thirdOfWords * 2).join(' ');
-    const thirdPart = words.slice(thirdOfWords * 2).join(' ');
-
-    return (
-      <>
-        {firstPart}
-        <br />
-        {secondPart}
-        <br />
-        {thirdPart}
-      </>
-    );
   };
 
   // Define animation variants
@@ -247,8 +347,8 @@ export default function Home() {
               exit="exit"
               onAnimationComplete={handleAnimationComplete}
             >
-              <h1 className="text-3xl md:text-4xl font-bold text-center text-black leading-tight">
-                {formatQuestion()}
+              <h1 className="text-3xl md:text-4xl font-bold text-center text-black leading-tight text-balance">
+                {isLoading ? 'Laden...' : displayedQuestion}
               </h1>
             </motion.div>
           </AnimatePresence>
@@ -257,104 +357,70 @@ export default function Home() {
         {/* Vote Counter and Options */}
         <div className="flex flex-row bg-gray-300">
           {/* Left Option */}
-          <div className="flex-1 flex flex-col items-center p-4 gap-3">
-            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={`left-count-${answer1Count}`}
-                  className="text-5xl md:text-6xl font-bold text-blue-600"
-                  variants={contentVariants}
-                  initial="hidden"
-                  animate={isAnimating ? 'exit' : 'visible'}
-                  exit="exit"
-                >
-                  {answer1Count}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={`left-text-${answer1Text}`}
-                  className="text-5xl md:text-6xl font-bold text-blue-600"
-                  variants={contentVariants}
-                  initial="hidden"
-                  animate={isAnimating ? 'exit' : 'visible'}
-                  exit="exit"
-                >
-                  {answer1Text}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <div className="w-full flex justify-center mt-2">
-              <div className="w-full">
-                <ArrowDown />
-              </div>
-            </div>
-          </div>
+          {isLoading ? (
+            <SkeletonVoteOption />
+          ) : (
+            <VoteOption
+              count={answer1Count}
+              text={answer1Text}
+              isAnimating={isAnimating}
+              contentVariants={contentVariants}
+              color={answer1Color}
+            />
+          )}
 
           {/* Center Gauge */}
-          <div className="flex-1 flex items-center justify-center py-4">
-            <div className="gauge-circle">
-              {/* Placeholder gauge markings */}
-              <div className="gauge-marking absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-1/2"></div>
-              <div className="gauge-marking absolute top-1/2 left-0 w-full h-0.5"></div>
-              <div className="gauge-marking absolute bottom-0 left-1/2 -translate-x-1/2 w-0.5 h-1/2"></div>
-
-              {/* Circular gauge arc (visual only) */}
-              <div className="absolute top-1 left-1 right-1 bottom-1/2 border-t-[12px] border-l-[12px] border-r-[12px] border-gray-400 rounded-t-full"></div>
-
-              {/* Gauge needle */}
-              <motion.div
-                className="gauge-needle"
-                initial={{ rotate: 0 }}
-                animate={{ rotate: needleRotation }}
-                transition={{ duration: 1, type: 'spring', stiffness: 50 }}
-                style={{
-                  transformOrigin: 'bottom center',
-                  translateX: '-50%',
-                }}
-              ></motion.div>
-              <div className="gauge-needle-pivot"></div>
+          <div className="flex-1 flex justify-center py-4">
+            <div className="w-full mx-auto">
+              {isLoading ? (
+                <div className="h-28 bg-gray-300 rounded-full animate-pulse" />
+              ) : (
+                <div className="bg-white/50 flex w-full h-full rounded-xl items-center justify-center">
+                  <GaugeComponent
+                    id="gauge-component"
+                    type="semicircle"
+                    style={{ width: '100%' }}
+                    value={gaugeValue}
+                    minValue={0}
+                    maxValue={100}
+                    arc={{
+                      colorArray: [answer1Color, answer2Color],
+                      nbSubArcs: 50,
+                      padding: 0.01,
+                      width: 0.4,
+                    }}
+                    pointer={{
+                      type: 'needle',
+                      color: '#464A4F',
+                      baseColor: '#464A4F',
+                      length: 0.8,
+                      width: 15,
+                      animate: true,
+                      animationDuration: 1000,
+                      elastic: true,
+                    }}
+                    labels={{
+                      valueLabel: { hide: true },
+                      tickLabels: { hideMinMax: true, ticks: [] },
+                    }}
+                  />
+                </div>
+              )}
             </div>
           </div>
 
           {/* Right Option */}
-          <div className="flex-1 flex flex-col items-center p-4 gap-3">
-            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={`right-count-${answer2Count}`}
-                  className="text-5xl md:text-6xl font-bold text-blue-600"
-                  variants={contentVariants}
-                  initial="hidden"
-                  animate={isAnimating ? 'exit' : 'visible'}
-                  exit="exit"
-                >
-                  {answer2Count}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
-              <AnimatePresence mode="wait">
-                <motion.span
-                  key={`right-text-${answer2Text}`}
-                  className="text-5xl md:text-6xl font-bold text-blue-600"
-                  variants={contentVariants}
-                  initial="hidden"
-                  animate={isAnimating ? 'exit' : 'visible'}
-                  exit="exit"
-                >
-                  {answer2Text}
-                </motion.span>
-              </AnimatePresence>
-            </div>
-            <div className="w-full flex justify-center mt-2">
-              <div className="w-full">
-                <ArrowDown />
-              </div>
-            </div>
-          </div>
+          {isLoading ? (
+            <SkeletonVoteOption />
+          ) : (
+            <VoteOption
+              count={answer2Count}
+              text={answer2Text}
+              isAnimating={isAnimating}
+              contentVariants={contentVariants}
+              color={answer2Color}
+            />
+          )}
         </div>
       </div>
     </main>

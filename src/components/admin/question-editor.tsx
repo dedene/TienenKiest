@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { ColorPicker } from '@/components/ui/color-picker';
 import {
   Dialog,
   DialogContent,
@@ -18,12 +19,16 @@ interface QuestionEditorProps {
     text: string;
     answer1Text?: string;
     answer2Text?: string;
+    answer1Color?: string;
+    answer2Color?: string;
   };
   onSave: (question: {
     id?: string;
     text: string;
     answer1Text?: string;
     answer2Text?: string;
+    answer1Color?: string;
+    answer2Color?: string;
   }) => Promise<void>;
 }
 
@@ -31,6 +36,8 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
   const [text, setText] = useState('');
   const [answer1Text, setAnswer1Text] = useState('Ja');
   const [answer2Text, setAnswer2Text] = useState('Nee');
+  const [answer1Color, setAnswer1Color] = useState('#0D9900');
+  const [answer2Color, setAnswer2Color] = useState('#D10000');
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
@@ -38,10 +45,14 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
       setText(question.text);
       setAnswer1Text(question.answer1Text || 'Ja');
       setAnswer2Text(question.answer2Text || 'Nee');
+      setAnswer1Color(question.answer1Color || '#0D9900');
+      setAnswer2Color(question.answer2Color || '#D10000');
     } else {
       setText('');
       setAnswer1Text('Ja');
       setAnswer2Text('Nee');
+      setAnswer1Color('#0D9900');
+      setAnswer2Color('#D10000');
     }
   }, [question]);
 
@@ -55,6 +66,8 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
         text,
         answer1Text,
         answer2Text,
+        answer1Color,
+        answer2Color,
       });
       onOpenChange(false);
     } catch (error) {
@@ -83,29 +96,43 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
               placeholder="Vul de vraag in..."
             />
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="answer1-text" className="text-right">
               Antwoord 1
             </Label>
             <Input
               id="answer1-text"
-              className="col-span-3"
+              className="col-span-2"
               value={answer1Text}
               onChange={(e) => setAnswer1Text(e.target.value)}
               placeholder="Vul het eerste antwoord in..."
             />
+            <div className="flex items-center gap-2">
+              <Label htmlFor="answer1-color" className="sr-only">
+                Kleur
+              </Label>
+              <ColorPicker value={answer1Color} onChange={setAnswer1Color} className="h-8 w-8" />
+            </div>
           </div>
+
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="answer2-text" className="text-right">
               Antwoord 2
             </Label>
             <Input
               id="answer2-text"
-              className="col-span-3"
+              className="col-span-2"
               value={answer2Text}
               onChange={(e) => setAnswer2Text(e.target.value)}
               placeholder="Vul het tweede antwoord in..."
             />
+            <div className="flex items-center gap-2">
+              <Label htmlFor="answer2-color" className="sr-only">
+                Kleur
+              </Label>
+              <ColorPicker value={answer2Color} onChange={setAnswer2Color} className="h-8 w-8" />
+            </div>
           </div>
         </div>
         <DialogFooter>

@@ -71,6 +71,8 @@ export const subscriptionsRouter = createTRPCRouter({
           answer2Text: string;
           answer1Count: number;
           answer2Count: number;
+          answer1Color: string;
+          answer2Color: string;
         } | null>((resolve) => {
           // Set up event handler with access to the resolve function
           let resolvePromise:
@@ -82,6 +84,8 @@ export const subscriptionsRouter = createTRPCRouter({
                   answer2Text: string;
                   answer1Count: number;
                   answer2Count: number;
+                  answer1Color: string;
+                  answer2Color: string;
                 } | null
               ) => void)
             | null = resolve;
@@ -104,6 +108,8 @@ export const subscriptionsRouter = createTRPCRouter({
                   answer2Text: question.answer2Text,
                   answer1Count: question.answer1Count,
                   answer2Count: question.answer2Count,
+                  answer1Color: question.answer1Color,
+                  answer2Color: question.answer2Color,
                 });
                 resolvePromise = null;
               }

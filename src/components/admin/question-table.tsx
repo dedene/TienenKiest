@@ -5,6 +5,7 @@ import { DeleteConfirmation } from '@/components/delete-confirmation';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ColorPicker } from '@/components/ui/color-picker';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   Table,
@@ -97,11 +98,25 @@ export const QuestionTable = () => {
     setIsDeleteDialogOpen(true);
   };
 
+  const handleColorChange = (questionId: string, answerPosition: 1 | 2) => (color: string) => {
+    // Update color in the database
+    const question = questions?.find((q) => q.id === questionId);
+    if (!question) return;
+
+    updateQuestionMutation.mutate({
+      id: questionId,
+      text: question.text,
+      [`answer${answerPosition}Color`]: color,
+    });
+  };
+
   const saveQuestion = async (questionData: {
     id?: string;
     text: string;
     answer1Text?: string;
     answer2Text?: string;
+    answer1Color?: string;
+    answer2Color?: string;
   }) => {
     if (questionData.id) {
       // Update existing question
@@ -110,6 +125,8 @@ export const QuestionTable = () => {
         text: questionData.text,
         answer1Text: questionData.answer1Text,
         answer2Text: questionData.answer2Text,
+        answer1Color: questionData.answer1Color,
+        answer2Color: questionData.answer2Color,
       });
     } else {
       // Create new question
@@ -117,6 +134,8 @@ export const QuestionTable = () => {
         text: questionData.text,
         answer1Text: questionData.answer1Text || 'Ja',
         answer2Text: questionData.answer2Text || 'Nee',
+        answer1Color: questionData.answer1Color || '#0D9900',
+        answer2Color: questionData.answer2Color || '#D10000',
       });
     }
   };
@@ -194,17 +213,33 @@ export const QuestionTable = () => {
                     <TableCell>
                       <div className="flex items-center justify-between">
                         <span>{question.answer1Text}</span>
-                        <Badge className={question.isActive ? 'animate-pulse' : ''}>
-                          {getAnswerCount(question.id, 1, question.answer1Count)}
-                        </Badge>
+                        <ColorPicker
+                          value={question.answer1Color || '#0D9900'}
+                          onChange={handleColorChange(question.id, 1)}
+                        >
+                          <Badge
+                            className={question.isActive ? 'animate-pulse' : ''}
+                            style={{ backgroundColor: question.answer1Color }}
+                          >
+                            {getAnswerCount(question.id, 1, question.answer1Count)}
+                          </Badge>
+                        </ColorPicker>
                       </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center justify-between">
                         <span>{question.answer2Text}</span>
-                        <Badge className={question.isActive ? 'animate-pulse' : ''}>
-                          {getAnswerCount(question.id, 2, question.answer2Count)}
-                        </Badge>
+                        <ColorPicker
+                          value={question.answer2Color || '#D10000'}
+                          onChange={handleColorChange(question.id, 2)}
+                        >
+                          <Badge
+                            className={question.isActive ? 'animate-pulse' : ''}
+                            style={{ backgroundColor: question.answer2Color }}
+                          >
+                            {getAnswerCount(question.id, 2, question.answer2Count)}
+                          </Badge>
+                        </ColorPicker>
                       </div>
                     </TableCell>
                     <TableCell className="text-right">

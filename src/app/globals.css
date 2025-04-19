@@ -175,7 +175,7 @@ body {
   border-top: 500px solid #4679BD;
 }
 
-/* Gauge circle style */
+/* Gauge styles */
 .gauge-circle {
   position: relative;
   width: 160px;
@@ -219,4 +219,34 @@ body {
   transform: translateX(-50%);
   z-index: 11;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+/* React Gauge Component customization */
+.gauge-component-class {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+}
+
+/* Style the svg container of the gauge */
+.gauge-component-class > svg {
+  width: 100%;
+  max-width: 240px;
+  height: auto;
+}
+
+/* Make the needle and base more visible */
+.gauge-component-class .needle, 
+.gauge-component-class .needle-base {
+  stroke-width: 2;
+  stroke: #464A4F;
+}
+
+/* Custom gauge arc background */
+.gauge-component-class .arc-background {
+  fill: #e5e7eb;
+  stroke: #6b7280;
+  stroke-width: 1;
 }

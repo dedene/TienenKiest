@@ -41,6 +41,8 @@ export const questionsRouter = createTRPCRouter({
         isActive: z.boolean().optional().default(false),
         answer1Text: z.string().min(1, { message: 'Answer 1 text is required' }),
         answer2Text: z.string().min(1, { message: 'Answer 2 text is required' }),
+        answer1Color: z.string().optional().default('#0D9900'),
+        answer2Color: z.string().optional().default('#D10000'),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -55,8 +57,10 @@ export const questionsRouter = createTRPCRouter({
         isActive: isFirstQuestion ? true : input.isActive || false,
         answer1Text: input.answer1Text,
         answer1Count: 0,
+        answer1Color: input.answer1Color || '#0D9900',
         answer2Text: input.answer2Text,
         answer2Count: 0,
+        answer2Color: input.answer2Color || '#D10000',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -83,6 +87,8 @@ export const questionsRouter = createTRPCRouter({
         isActive: z.boolean().optional(),
         answer1Text: z.string().optional(),
         answer2Text: z.string().optional(),
+        answer1Color: z.string().optional(),
+        answer2Color: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -101,6 +107,14 @@ export const questionsRouter = createTRPCRouter({
 
       if (input.answer2Text) {
         updateData.answer2Text = input.answer2Text;
+      }
+
+      if (input.answer1Color) {
+        updateData.answer1Color = input.answer1Color;
+      }
+
+      if (input.answer2Color) {
+        updateData.answer2Color = input.answer2Color;
       }
 
       const updatedQuestion = await ctx.db
