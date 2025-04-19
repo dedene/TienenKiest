@@ -1,6 +1,6 @@
 'use client';
 
-import { trpc } from '@/trpc/client';
+import { trpc } from '@/lib/trpc';
 import { useState, useEffect, useRef } from 'react';
 
 export default function Home() {
@@ -13,7 +13,6 @@ export default function Home() {
       { activeOnly: true },
       {
         enabled: true, // Run on mount to get initial data quickly
-        refetchInterval: 10000, // Refresh every 10 seconds as a fallback
       }
     );
 
@@ -87,21 +86,21 @@ export default function Home() {
 
   // Update local state with new question data
   const updateDisplayedData = (data: {
-    text: string;
+    question: string;
     answer1Text: string;
     answer1Count: number;
     answer2Text: string;
     answer2Count: number;
   }) => {
-    setDisplayedQuestion(data.text);
+    setDisplayedQuestion(data.question);
     setAnswer1Text(data.answer1Text);
     setAnswer1Count(data.answer1Count);
     setAnswer2Text(data.answer2Text);
     setAnswer2Count(data.answer2Count);
 
-    // Calculate gauge needle position
+    // Calculate gauge needle position - FLIPPED to show answer2Count on left, answer1Count on right
     const total = data.answer1Count + data.answer2Count;
-    const ratio = total > 0 ? data.answer1Count / total : 0.5;
+    const ratio = total > 0 ? data.answer2Count / total : 0.5; // Flipped from answer1Count to answer2Count
     const degrees = ratio * 180 - 90; // Maps from 0 to 180 degrees, centered at -90
     setNeedleRotation(degrees);
   };
@@ -121,7 +120,7 @@ export default function Home() {
           setIsFading(true);
           setTimeout(() => {
             updateDisplayedData({
-              text: question.text,
+              question: question.text,
               answer1Text: question.answer1Text,
               answer1Count: question.answer1Count,
               answer2Text: question.answer2Text,
@@ -136,7 +135,7 @@ export default function Home() {
         } else {
           // First load, no transition
           updateDisplayedData({
-            text: question.text,
+            question: question.text,
             answer1Text: question.answer1Text,
             answer1Count: question.answer1Count,
             answer2Text: question.answer2Text,
@@ -147,7 +146,7 @@ export default function Home() {
       } else {
         // Same question but maybe updated counts
         updateDisplayedData({
-          text: question.text,
+          question: question.text,
           answer1Text: question.answer1Text,
           answer1Count: question.answer1Count,
           answer2Text: question.answer2Text,

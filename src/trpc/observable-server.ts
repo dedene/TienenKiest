@@ -1,103 +1,65 @@
 import { EventEmitter } from 'events';
 
-/**
- * Enhanced EventEmitter with detailed logging for debugging
- */
-class DiagnosticEventEmitter {
+// Define event types with their payloads
+interface ServerEvents {
+  counterUpdate: {
+    answerId: string;
+    count: number;
+  };
+  activeQuestion: {
+    questionId: string;
+  };
+}
+
+// Create a type-safe event emitter
+class TypedEventEmitter<T extends Record<string, unknown>> {
   private emitter = new EventEmitter();
   private name: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private listeners = new Map<string, Set<(...args: any[]) => void>>();
 
   constructor(name: string) {
     this.name = name;
+
+    // Set a higher limit for listeners to avoid memory leak warnings
     this.emitter.setMaxListeners(20);
-
-    // Log every 30 seconds how many listeners we have
-    setInterval(() => {
-      console.log(`[MONITOR] ${this.name} event emitter has ${this.countAllListeners()} listeners`);
-      this.listeners.forEach((listenerSet, event) => {
-        console.log(`[MONITOR] ${this.name}.${event}: ${listenerSet.size} listeners`);
-      });
-    }, 30000);
   }
 
-  countAllListeners(): number {
-    let count = 0;
-    this.listeners.forEach((set) => {
-      count += set.size;
-    });
-    return count;
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  emit(event: string, ...args: any[]): void {
+  // Create an event emitter for each event type
+  emit<K extends keyof T>(event: K, data: T[K]): void {
+    console.log(`[${this.name}] Emitting event '${String(event)}'`, data);
+    this.emitter.emit(String(event), data);
     console.log(
-      `[EMITTER] ${this.name}.${event} emitting with ${
-        this.listeners.get(event)?.size || 0
-      } listeners`
+      `[${this.name}] Event '${String(event)}' emitted, listener count:`,
+      this.emitter.listenerCount(String(event))
     );
-    try {
-      this.emitter.emit(event, ...args);
-      console.log(`[EMITTER] ${this.name}.${event} successfully emitted`);
-    } catch (error) {
-      console.error(`[EMITTER ERROR] Error emitting ${this.name}.${event}:`, error);
-    }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  on(event: string, listener: (...args: any[]) => void): void {
-    if (!this.listeners.has(event)) {
-      this.listeners.set(event, new Set());
-    }
-    this.listeners.get(event)?.add(listener);
-
+  // Listen to events
+  on<K extends keyof T>(event: K, listener: (data: T[K]) => void): void {
+    console.log(`[${this.name}] Adding listener for event '${String(event)}'`);
+    this.emitter.on(String(event), listener);
     console.log(
-      `[LISTENER] Adding listener to ${this.name}.${event}, now has ${
-        this.listeners.get(event)?.size
-      } listeners`
+      `[${this.name}] Listener added for '${String(event)}', current count:`,
+      this.emitter.listenerCount(String(event))
     );
-
-    this.emitter.on(event, listener);
-
-    // Manually test the listener by calling it directly to verify it works
-    try {
-      if (event === 'activeQuestionChange') {
-        console.log(`[TEST] Testing new ${this.name}.${event} listener directly`);
-        listener({ questionId: 'test-id-direct-call' });
-      }
-    } catch (error) {
-      console.error(`[TEST ERROR] Error testing ${this.name}.${event} listener:`, error);
-    }
   }
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  off(event: string, listener: (...args: any[]) => void): void {
-    const listenerSet = this.listeners.get(event);
-    if (listenerSet) {
-      listenerSet.delete(listener);
-      console.log(
-        `[LISTENER] Removed listener from ${this.name}.${event}, now has ${listenerSet.size} listeners`
-      );
-    }
-
-    this.emitter.off(event, listener);
+  // Remove event listener
+  off<K extends keyof T>(event: K, listener: (data: T[K]) => void): void {
+    console.log(`[${this.name}] Removing listener for event '${String(event)}'`);
+    this.emitter.off(String(event), listener);
+    console.log(
+      `[${this.name}] Listener removed for '${String(event)}', remaining count:`,
+      this.emitter.listenerCount(String(event))
+    );
   }
 }
 
-/**
- * Server-wide event emitters for various event types
- */
+// Create the observable server instance
 export const observableServer = {
-  counterUpdate: new DiagnosticEventEmitter('counterUpdate'),
-  activeQuestionChange: new DiagnosticEventEmitter('activeQuestionChange'),
+  counterUpdate: new TypedEventEmitter<{ counterUpdate: ServerEvents['counterUpdate'] }>(
+    'counterUpdate'
+  ),
+  activeQuestion: new TypedEventEmitter<{ activeQuestion: ServerEvents['activeQuestion'] }>(
+    'activeQuestion'
+  ),
 };
-
-// Create a test emitter function that can be called from anywhere to test event propagation
-export function testEvents(): void {
-  console.log('[TEST] Testing event emission');
-  observableServer.activeQuestionChange.emit('activeQuestionChange', {
-    questionId: 'test-id-' + Date.now(),
-  });
-  console.log('[TEST] Test event emission complete');
-}

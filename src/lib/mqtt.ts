@@ -1,53 +1,20 @@
 import { mqttConfig } from '../config/mqtt';
-import { observableServer } from '../trpc/observable-server';
+import { emitCounterUpdate } from '../lib/global-event-bus';
 import { db } from './db';
 import { questions } from './db/schema';
 import { eq } from 'drizzle-orm';
 import mqtt from 'mqtt';
 
 let mqttClient: mqtt.MqttClient | null = null;
-// Track the current active question ID
-let currentActiveQuestionId: string | null = null;
+
+// Log on module initialization
+console.log('MQTT module loaded');
 
 interface MQTTConfig {
   broker: string;
   port: number;
   username?: string;
   password?: string;
-}
-
-// Helper function to check and update the current active question
-async function checkActiveQuestionChange() {
-  try {
-    const activeQuestion = await db.query.questions.findFirst({
-      where: eq(questions.isActive, true),
-    });
-
-    if (activeQuestion && activeQuestion.id !== currentActiveQuestionId) {
-      // Update the current active question ID
-      const oldId = currentActiveQuestionId;
-      currentActiveQuestionId = activeQuestion.id;
-
-      console.log(
-        `[DEBUG MQTT] Active question change detected from ${oldId} to ${activeQuestion.id}`
-      );
-
-      // Emit the event
-      console.log(`[DEBUG MQTT] Emitting activeQuestionChange event for: ${activeQuestion.id}`);
-      observableServer.activeQuestionChange.emit('activeQuestionChange', {
-        questionId: activeQuestion.id,
-      });
-      console.log(`[DEBUG MQTT] activeQuestionChange event emitted successfully`);
-
-      console.log(`Active question changed to: ${activeQuestion.id}`);
-      return true;
-    }
-
-    return false;
-  } catch (error) {
-    console.error('Error checking for active question changes:', error);
-    return false;
-  }
 }
 
 // Setup MQTT client and listeners
@@ -75,22 +42,27 @@ export function setupMQTTClient(config: MQTTConfig) {
     // Subscribe to counter topics
     mqttClient.subscribe('counter/+', { qos: 0 });
     mqttClient.subscribe('image/+', { qos: 0 });
-
-    // Check for active question on connection
-    await checkActiveQuestionChange();
   });
 
   // Handle messages
   mqttClient.on('message', async (topic, payload) => {
-    console.log(`Received message on topic: ${topic}`);
+    console.log(`Received message on topic: ${topic}, payload: ${payload.toString()}`);
 
     if (topic.startsWith('counter/')) {
       const answerPosition = topic.split('/')[1];
-      if (!answerPosition || (answerPosition !== '1' && answerPosition !== '2')) return;
+      if (!answerPosition || (answerPosition !== '1' && answerPosition !== '2')) {
+        console.log(`Invalid answer position: ${answerPosition}`);
+        return;
+      }
 
       try {
         const count = parseInt(payload.toString(), 10);
-        if (isNaN(count)) return;
+        if (isNaN(count)) {
+          console.log(`Invalid count value: ${payload.toString()}`);
+          return;
+        }
+
+        console.log(`Processing counter update for position ${answerPosition}, count: ${count}`);
 
         // Find the active question
         const activeQuestion = await db.query.questions.findFirst({
@@ -102,14 +74,7 @@ export function setupMQTTClient(config: MQTTConfig) {
           return;
         }
 
-        // Check if the active question has changed
-        if (currentActiveQuestionId !== activeQuestion.id) {
-          // Update tracking and emit change event
-          currentActiveQuestionId = activeQuestion.id;
-          observableServer.activeQuestionChange.emit('activeQuestionChange', {
-            questionId: activeQuestion.id,
-          });
-        }
+        console.log(`Found active question: ${activeQuestion.id}`);
 
         // Update the counter in the database based on answer position
         const updateData = {
@@ -123,11 +88,15 @@ export function setupMQTTClient(config: MQTTConfig) {
         const answerId =
           answerPosition === '1' ? `${activeQuestion.id}_answer1` : `${activeQuestion.id}_answer2`;
 
-        // Emit event through tRPC observable
-        observableServer.counterUpdate.emit('counterUpdate', {
+        console.log(`Emitting counterUpdate event with answerId: ${answerId}, count: ${count}`);
+
+        // Emit event through global event bus
+        emitCounterUpdate({
           answerId,
           count,
         });
+
+        console.log('counterUpdate event emitted successfully');
       } catch (error) {
         console.error('Error processing counter update:', error);
       }
@@ -170,14 +139,6 @@ export async function resetCounters() {
       return false;
     }
 
-    // Check if active question has changed
-    if (currentActiveQuestionId !== activeQuestion.id) {
-      currentActiveQuestionId = activeQuestion.id;
-      observableServer.activeQuestionChange.emit('activeQuestionChange', {
-        questionId: activeQuestion.id,
-      });
-    }
-
     // Update the database to reset both counters
     await db
       .update(questions)
@@ -192,12 +153,12 @@ export async function resetCounters() {
     publishMessage(mqttConfig.topics.setCounter1, '0');
     publishMessage(mqttConfig.topics.setCounter2, '0');
 
-    // Emit update through tRPC observable
+    // Emit update through global event bus
     const answer1Id = `${activeQuestion.id}_answer1`;
     const answer2Id = `${activeQuestion.id}_answer2`;
 
-    observableServer.counterUpdate.emit('counterUpdate', { answerId: answer1Id, count: 0 });
-    observableServer.counterUpdate.emit('counterUpdate', { answerId: answer2Id, count: 0 });
+    emitCounterUpdate({ answerId: answer1Id, count: 0 });
+    emitCounterUpdate({ answerId: answer2Id, count: 0 });
 
     return true;
   } catch (error) {

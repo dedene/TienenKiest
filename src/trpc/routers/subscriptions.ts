@@ -1,172 +1,150 @@
 import { publicProcedure, createTRPCRouter } from '../init';
-import { observableServer } from '../observable-server';
 import { questions } from '@/lib/db/schema';
-import { observable } from '@trpc/server/observable';
+import {
+  onCounterUpdate,
+  offCounterUpdate,
+  onActiveQuestion,
+  offActiveQuestion,
+  getListenerCount,
+  testEmitEvent,
+} from '@/lib/global-event-bus';
 import { eq } from 'drizzle-orm';
+
+// Log the global event bus state
+console.log('subscriptionsRouter - Checking global event bus listener counts:', getListenerCount());
+
+// Test event emission on module load
+testEmitEvent('subscriptions-router-init');
+console.log('Test event emitted from subscriptions router');
 
 export const subscriptionsRouter = createTRPCRouter({
   // Subscribe to counter updates
-  counterUpdates: publicProcedure.subscription(() => {
-    return observable<{
-      answerId: string;
-      count: number;
-    }>((emit) => {
-      const onCounterUpdate = (data: { answerId: string; count: number }) => {
-        emit.next(data);
-      };
+  counterUpdates: publicProcedure.subscription(async function* (opts) {
+    console.log('Setting up counterUpdates subscription on global event bus');
+    console.log('Current listener counts:', getListenerCount());
 
-      // Subscribe to counter updates
-      observableServer.counterUpdate.on('counterUpdate', onCounterUpdate);
+    // Set up event handler with access to the resolve function
+    let resolvePromise: ((data: { answerId: string; count: number }) => void) | null = null;
 
-      // Cleanup when unsubscribed
-      return () => {
-        observableServer.counterUpdate.off('counterUpdate', onCounterUpdate);
-      };
-    });
+    const onCounterUpdateHandler = (data: { answerId: string; count: number }) => {
+      console.log('Subscription received counterUpdate event:', data);
+      if (resolvePromise) {
+        resolvePromise(data);
+        resolvePromise = null;
+      }
+    };
+
+    // Listen for counter updates using the global event bus
+    onCounterUpdate(onCounterUpdateHandler);
+    console.log('Subscription registered, current counts:', getListenerCount());
+
+    try {
+      // Keep subscription alive and yield updates when they come
+      while (opts.signal && !opts.signal.aborted) {
+        // Wait for next event using a promise
+        const data = await new Promise<{ answerId: string; count: number }>((resolve) => {
+          resolvePromise = resolve;
+
+          // Cleanup if aborted
+          if (opts.signal) {
+            opts.signal.addEventListener('abort', () => {
+              resolvePromise = null;
+            });
+          }
+        });
+
+        // Emit the update to the client
+        console.log('Yielding counter update to client:', data);
+        yield data;
+      }
+    } finally {
+      // Cleanup when subscription ends
+      console.log('Cleaning up counterUpdates subscription');
+      offCounterUpdate(onCounterUpdateHandler);
+    }
   }),
 
   // Subscribe to active question updates
-  activeQuestion: publicProcedure.subscription(({ ctx }) => {
-    // Return an observable that emits the active question
-    return observable<{
-      id: string;
-      text: string;
-      answer1Text: string;
-      answer1Count: number;
-      answer2Text: string;
-      answer2Count: number;
-    }>((emit) => {
-      // Track the current question to avoid duplicate emits
-      let currentQuestionId: string | null = null;
+  activeQuestion: publicProcedure.subscription(async function* (opts) {
+    console.log('Setting up activeQuestion subscription with global event bus');
+    console.log('Current listener counts:', getListenerCount());
 
-      // Fetch and emit function - needs to be defined before it's used
-      const fetchAndEmitQuestion = async () => {
-        try {
-          console.log('[DEBUG] Fetching active question');
-          const activeQuestions = await ctx.db
-            .select()
-            .from(questions)
-            .where(eq(questions.isActive, true));
+    try {
+      while (opts.signal && !opts.signal.aborted) {
+        // Wait for the next active question update
+        const questionData = await new Promise<{
+          id: string;
+          question: string;
+          answer1Text: string;
+          answer2Text: string;
+          answer1Count: number;
+          answer2Count: number;
+        } | null>((resolve) => {
+          // Set up event handler with access to the resolve function
+          let resolvePromise:
+            | ((
+                data: {
+                  id: string;
+                  question: string;
+                  answer1Text: string;
+                  answer2Text: string;
+                  answer1Count: number;
+                  answer2Count: number;
+                } | null
+              ) => void)
+            | null = resolve;
 
-          if (activeQuestions && activeQuestions.length > 0) {
-            const question = activeQuestions[0];
+          const activeQuestionHandler = async (data: { questionId: string }) => {
+            console.log('Subscription received activeQuestion event:', data);
 
-            // Only emit if the question is different or it's the first one
-            if (question.id !== currentQuestionId || currentQuestionId === null) {
-              console.log('[DEBUG] Emitting question data for:', question.id);
-              currentQuestionId = question.id;
+            // Get the question data from the database
+            const question = await opts.ctx.db.query.questions.findFirst({
+              where: eq(questions.id, data.questionId),
+            });
 
-              emit.next({
-                id: question.id,
-                text: question.text,
-                answer1Text: question.answer1Text,
-                answer1Count: question.answer1Count,
-                answer2Text: question.answer2Text,
-                answer2Count: question.answer2Count,
-              });
+            if (question) {
+              console.log('Found question, emitting update:', question);
+              if (resolvePromise) {
+                resolvePromise({
+                  id: question.id,
+                  question: question.text,
+                  answer1Text: question.answer1Text,
+                  answer2Text: question.answer2Text,
+                  answer1Count: question.answer1Count,
+                  answer2Count: question.answer2Count,
+                });
+                resolvePromise = null;
+              }
             } else {
-              console.log('[DEBUG] Question unchanged, not emitting');
+              console.log('No question found for ID:', data.questionId);
+              if (resolvePromise) {
+                resolvePromise(null);
+                resolvePromise = null;
+              }
             }
-          } else {
-            console.log('[DEBUG] No active question found');
+          };
+
+          // Register the handler with the global event bus
+          onActiveQuestion(activeQuestionHandler);
+
+          // Cleanup if aborted
+          if (opts.signal) {
+            opts.signal.addEventListener('abort', () => {
+              console.log('Aborting activeQuestion subscription');
+              offActiveQuestion(activeQuestionHandler);
+              resolvePromise = null;
+            });
           }
-        } catch (error) {
-          console.error('Error fetching active question:', error);
+        });
+
+        // Only yield if we got valid data
+        if (questionData) {
+          console.log('Yielding active question update to client:', questionData);
+          yield questionData;
         }
-      };
-
-      // Execute initial fetch immediately
-      fetchAndEmitQuestion();
-
-      // Listen for active question changes
-      const onActiveQuestionChange = async (data: { questionId: string }) => {
-        console.log('[DEBUG] Active question change event received:', data.questionId);
-        console.log('[DEBUG] Current stack:', new Error().stack);
-        console.log('[DEBUG] Current question ID in memory:', currentQuestionId);
-
-        try {
-          // Always fetch on question change events
-          await fetchAndEmitQuestion();
-        } catch (error) {
-          console.error('Error in fetchAndEmitQuestion after active question change:', error);
-        }
-      };
-
-      // Listen for counter updates - this might change the counts
-      const onCounterUpdate = async (data: { answerId: string; count: number }) => {
-        if (!currentQuestionId) {
-          // No active question yet, fetch one
-          try {
-            await fetchAndEmitQuestion();
-          } catch (error) {
-            console.error('Error fetching question during counter update:', error);
-          }
-          return;
-        }
-
-        // Check if this counter update is for our question
-        if (data.answerId.startsWith(currentQuestionId)) {
-          console.log('[DEBUG] Counter update for current question:', data);
-
-          try {
-            // Get the current question data
-            const activeQuestion = await ctx.db
-              .select()
-              .from(questions)
-              .where(eq(questions.id, currentQuestionId));
-
-            if (activeQuestion && activeQuestion.length > 0) {
-              const question = activeQuestion[0];
-
-              emit.next({
-                id: question.id,
-                text: question.text,
-                answer1Text: question.answer1Text,
-                answer1Count: question.answer1Count,
-                answer2Text: question.answer2Text,
-                answer2Count: question.answer2Count,
-              });
-            }
-          } catch (error) {
-            console.error('Error processing counter update for question:', error);
-          }
-        }
-      };
-
-      // Set up listeners
-      console.log('[DEBUG] Setting up subscription listeners');
-
-      // Simplify the handlers
-      const counterHandler = (data: { answerId: string; count: number }) => {
-        onCounterUpdate(data).catch((err) =>
-          console.error('Error in counter update handler:', err)
-        );
-      };
-
-      const questionChangeHandler = (data: { questionId: string }) => {
-        console.log(
-          '[DEBUG] Active question change event received through direct handler:',
-          data.questionId
-        );
-        onActiveQuestionChange(data).catch((err) =>
-          console.error('Error in active question handler:', err)
-        );
-      };
-
-      // Register with simple functions
-      observableServer.counterUpdate.on('counterUpdate', counterHandler);
-      observableServer.activeQuestionChange.on('activeQuestionChange', questionChangeHandler);
-
-      // Test direct call
-      console.log('[DEBUG] Testing direct handler call');
-      questionChangeHandler({ questionId: 'test-direct-call' });
-
-      // Cleanup when unsubscribed
-      return () => {
-        console.log('[DEBUG] Removing subscription listeners');
-        observableServer.counterUpdate.off('counterUpdate', counterHandler);
-        observableServer.activeQuestionChange.off('activeQuestionChange', questionChangeHandler);
-      };
-    });
+      }
+    } finally {
+      console.log('Cleaning up activeQuestion subscription');
+    }
   }),
 });

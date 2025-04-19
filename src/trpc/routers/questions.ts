@@ -1,6 +1,6 @@
 import { publicProcedure, createTRPCRouter } from '../init';
-import { observableServer } from '../observable-server';
 import { questions, NewQuestion } from '@/lib/db/schema';
+import { emitActiveQuestion } from '@/lib/global-event-bus';
 import { resetCounters } from '@/lib/mqtt';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
@@ -65,7 +65,8 @@ export const questionsRouter = createTRPCRouter({
 
       // Emit event if the new question is set as active
       if (newQuestion.isActive) {
-        observableServer.activeQuestionChange.emit('activeQuestionChange', {
+        console.log('Emitting activeQuestion event for new question:', newQuestion.id);
+        emitActiveQuestion({
           questionId: newQuestion.id,
         });
       }
@@ -116,8 +117,8 @@ export const questionsRouter = createTRPCRouter({
       // 1. The question was set to active, or
       // 2. The question was updated and it's already active (to update text/options)
       if (input.isActive === true || updatedQuestion[0].isActive) {
-        console.log('Emitting activeQuestionChange event after update for question:', input.id);
-        observableServer.activeQuestionChange.emit('activeQuestionChange', {
+        console.log('Emitting activeQuestion event after update for question:', input.id);
+        emitActiveQuestion({
           questionId: input.id,
         });
       }
@@ -180,17 +181,10 @@ export const questionsRouter = createTRPCRouter({
 
       // Emit event for active question change if we're activating
       if (isActive) {
-        console.log('Emitting activeQuestionChange event for question:', input.id);
-        console.log('Active question state before emit:', updatedQuestion[0]);
-
-        try {
-          observableServer.activeQuestionChange.emit('activeQuestionChange', {
-            questionId: input.id,
-          });
-          console.log('activeQuestionChange event emitted successfully');
-        } catch (error) {
-          console.error('Error emitting activeQuestionChange event:', error);
-        }
+        console.log('Emitting activeQuestion event after toggle for question:', input.id);
+        emitActiveQuestion({
+          questionId: input.id,
+        });
       }
 
       return updatedQuestion[0];
@@ -207,8 +201,8 @@ export const questionsRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  // Debug endpoint to test activeQuestionChange event
-  testActiveQuestionChange: publicProcedure
+  // Debug endpoint to test activeQuestion event
+  testActiveQuestion: publicProcedure
     .input(
       z.object({
         questionId: z.string().optional(),
@@ -216,13 +210,13 @@ export const questionsRouter = createTRPCRouter({
     )
     .mutation(({ input }) => {
       const testId = input.questionId || `test-${Date.now()}`;
-      console.log(`[TEST] Manually triggering activeQuestionChange event for: ${testId}`);
+      console.log(`[TEST] Manually triggering activeQuestion event for: ${testId}`);
 
       try {
-        observableServer.activeQuestionChange.emit('activeQuestionChange', {
+        emitActiveQuestion({
           questionId: testId,
         });
-        console.log(`[TEST] Manual activeQuestionChange event emitted successfully`);
+        console.log(`[TEST] Manual activeQuestion event emitted successfully`);
         return { success: true, questionId: testId };
       } catch (error) {
         console.error('[TEST] Error emitting test event:', error);

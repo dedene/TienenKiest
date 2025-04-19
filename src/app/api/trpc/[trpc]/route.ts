@@ -8,6 +8,11 @@ const handler = (req: Request) => {
     req,
     router: appRouter,
     createContext: createTRPCContext,
+    onError({ error }) {
+      if (error.code === 'INTERNAL_SERVER_ERROR') {
+        console.error('Something went wrong', error);
+      }
+    },
   });
 };
 
