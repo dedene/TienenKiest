@@ -1,4 +1,4 @@
-import { mqttConfig } from '../config/mqtt';
+import { mqttConfig } from '@/config/mqtt';
 import { setupMQTTClient } from '@/lib/mqtt';
 import { createContext } from '@/trpc/context';
 import { appRouter } from '@/trpc/routers';

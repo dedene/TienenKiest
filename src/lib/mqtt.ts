@@ -6,12 +6,48 @@ import { eq } from 'drizzle-orm';
 import mqtt from 'mqtt';
 
 let mqttClient: mqtt.MqttClient | null = null;
+// Track the current active question ID
+let currentActiveQuestionId: string | null = null;
 
 interface MQTTConfig {
   broker: string;
   port: number;
   username?: string;
   password?: string;
+}
+
+// Helper function to check and update the current active question
+async function checkActiveQuestionChange() {
+  try {
+    const activeQuestion = await db.query.questions.findFirst({
+      where: eq(questions.isActive, true),
+    });
+
+    if (activeQuestion && activeQuestion.id !== currentActiveQuestionId) {
+      // Update the current active question ID
+      const oldId = currentActiveQuestionId;
+      currentActiveQuestionId = activeQuestion.id;
+
+      console.log(
+        `[DEBUG MQTT] Active question change detected from ${oldId} to ${activeQuestion.id}`
+      );
+
+      // Emit the event
+      console.log(`[DEBUG MQTT] Emitting activeQuestionChange event for: ${activeQuestion.id}`);
+      observableServer.activeQuestionChange.emit('activeQuestionChange', {
+        questionId: activeQuestion.id,
+      });
+      console.log(`[DEBUG MQTT] activeQuestionChange event emitted successfully`);
+
+      console.log(`Active question changed to: ${activeQuestion.id}`);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('Error checking for active question changes:', error);
+    return false;
+  }
 }
 
 // Setup MQTT client and listeners
@@ -28,7 +64,7 @@ export function setupMQTTClient(config: MQTTConfig) {
   });
 
   // Handle connection
-  mqttClient.on('connect', () => {
+  mqttClient.on('connect', async () => {
     console.log('Connected to MQTT broker');
 
     if (!mqttClient) {
@@ -39,6 +75,9 @@ export function setupMQTTClient(config: MQTTConfig) {
     // Subscribe to counter topics
     mqttClient.subscribe('counter/+', { qos: 0 });
     mqttClient.subscribe('image/+', { qos: 0 });
+
+    // Check for active question on connection
+    await checkActiveQuestionChange();
   });
 
   // Handle messages
@@ -61,6 +100,15 @@ export function setupMQTTClient(config: MQTTConfig) {
         if (!activeQuestion) {
           console.error('No active question found');
           return;
+        }
+
+        // Check if the active question has changed
+        if (currentActiveQuestionId !== activeQuestion.id) {
+          // Update tracking and emit change event
+          currentActiveQuestionId = activeQuestion.id;
+          observableServer.activeQuestionChange.emit('activeQuestionChange', {
+            questionId: activeQuestion.id,
+          });
         }
 
         // Update the counter in the database based on answer position
@@ -120,6 +168,14 @@ export async function resetCounters() {
     if (!activeQuestion) {
       console.error('No active question found');
       return false;
+    }
+
+    // Check if active question has changed
+    if (currentActiveQuestionId !== activeQuestion.id) {
+      currentActiveQuestionId = activeQuestion.id;
+      observableServer.activeQuestionChange.emit('activeQuestionChange', {
+        questionId: activeQuestion.id,
+      });
     }
 
     // Update the database to reset both counters
