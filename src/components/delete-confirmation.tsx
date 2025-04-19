@@ -50,7 +50,7 @@ export function DeleteConfirmation({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isDeleting}>
             Annuleren
           </Button>
-          <Button variant="destructive" onClick={handleDelete} disabled={isDeleting}>
+          <Button variant="destructive-outline" onClick={handleDelete} disabled={isDeleting}>
             {isDeleting ? 'Bezig met verwijderen...' : 'Verwijderen'}
           </Button>
         </DialogFooter>

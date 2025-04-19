@@ -7,6 +7,6 @@ export async function register() {
 
     // Then initialize MQTT client
     const { initMQTTClient } = await import('./lib/mqtt-server');
-    initMQTTClient();
+    await initMQTTClient();
   }
 }

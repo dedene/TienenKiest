@@ -1,7 +1,7 @@
 import { publicProcedure, createTRPCRouter } from '../init';
 import { questions, NewQuestion } from '@/lib/db/schema';
 import { emitActiveQuestion } from '@/lib/global-event-bus';
-import { resetCounters } from '@/lib/mqtt';
+import { resetCounters as resetCountersMQTT } from '@/lib/mqtt';
 import { eq } from 'drizzle-orm';
 import { v4 as uuidv4 } from 'uuid';
 import { z } from 'zod';
@@ -183,13 +183,14 @@ export const questionsRouter = createTRPCRouter({
         updatedAt: new Date().toISOString(),
       };
 
-      const updatedQuestion = await ctx.db
+      const questionQuery = await ctx.db
         .update(questions)
         .set(updateData)
         .where(eq(questions.id, input.id))
         .returning();
 
-      if (!updatedQuestion || updatedQuestion.length === 0) {
+      const updatedQuestion = questionQuery?.[0];
+      if (!updatedQuestion) {
         throw new Error('Question not found');
       }
 
@@ -197,44 +198,42 @@ export const questionsRouter = createTRPCRouter({
       if (isActive) {
         console.log('Emitting activeQuestion event after toggle for question:', input.id);
         emitActiveQuestion({
-          questionId: input.id,
+          questionId: updatedQuestion.id,
         });
+
+        await resetCountersMQTT(
+          updatedQuestion.id,
+          updatedQuestion.answer1Count,
+          updatedQuestion.answer2Count
+        );
       }
 
-      return updatedQuestion[0];
+      return updatedQuestion;
     }),
 
   // Reset counters for the active question
-  resetCounters: publicProcedure.mutation(async () => {
-    const result = await resetCounters();
+  resetCounters: publicProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+    const questionQuery = await ctx.db.select().from(questions).where(eq(questions.id, input));
+    const question = questionQuery?.[0];
 
-    if (!result) {
-      throw new Error('Failed to reset counters or no active question found');
+    if (!question) {
+      throw new Error('Question not found');
+    }
+
+    // update the question with the new counters
+    await ctx.db
+      .update(questions)
+      .set({ answer1Count: 0, answer2Count: 0 })
+      .where(eq(questions.id, input));
+
+    if (question.isActive) {
+      const result = await resetCountersMQTT(question.id);
+
+      if (!result) {
+        throw new Error('Failed to reset counters or no active question found');
+      }
     }
 
     return { success: true };
   }),
-
-  // Debug endpoint to test activeQuestion event
-  testActiveQuestion: publicProcedure
-    .input(
-      z.object({
-        questionId: z.string().optional(),
-      })
-    )
-    .mutation(({ input }) => {
-      const testId = input.questionId || `test-${Date.now()}`;
-      console.log(`[TEST] Manually triggering activeQuestion event for: ${testId}`);
-
-      try {
-        emitActiveQuestion({
-          questionId: testId,
-        });
-        console.log(`[TEST] Manual activeQuestion event emitted successfully`);
-        return { success: true, questionId: testId };
-      } catch (error) {
-        console.error('[TEST] Error emitting test event:', error);
-        throw new Error('Failed to emit test event');
-      }
-    }),
 });

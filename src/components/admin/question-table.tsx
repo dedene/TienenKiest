@@ -6,6 +6,14 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { ColorPicker } from '@/components/ui/color-picker';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
 import { IconButton } from '@/components/ui/icon-button';
 import {
   Table,
@@ -17,7 +25,15 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { trpc } from '@/lib/trpc';
-import { AlertCircle, PencilIcon, PlusCircle, TrashIcon, Star, StarIcon } from 'lucide-react';
+import {
+  AlertCircle,
+  PencilIcon,
+  PlusCircle,
+  TrashIcon,
+  Star,
+  StarIcon,
+  RotateCcw,
+} from 'lucide-react';
 import { useState } from 'react';
 
 export const QuestionTable = () => {
@@ -34,6 +50,12 @@ export const QuestionTable = () => {
     text: string;
   } | null>(null);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+
+  const [resetCountersQuestion, setResetCountersQuestion] = useState<{
+    id: string;
+    text: string;
+  } | null>(null);
+  const [isResetCountersDialogOpen, setIsResetCountersDialogOpen] = useState(false);
 
   // Local state to track real-time counters
   const [liveCounters, setLiveCounters] = useState<Record<string, number>>({});
@@ -71,6 +93,10 @@ export const QuestionTable = () => {
     onSuccess: () => refetch(),
   });
 
+  const resetCountersMutation = trpc.questions.resetCounters.useMutation({
+    onSuccess: () => refetch(),
+  });
+
   const handleActivate = async (questionId: string) => {
     toggleActiveMutation.mutate({
       id: questionId,
@@ -96,6 +122,18 @@ export const QuestionTable = () => {
   const handleDelete = (question: { id: string; text: string }) => {
     setDeletingQuestion(question);
     setIsDeleteDialogOpen(true);
+  };
+
+  const handleResetCounters = (question: { id: string; text: string }) => {
+    setResetCountersQuestion(question);
+    setIsResetCountersDialogOpen(true);
+  };
+
+  const confirmResetCounters = async () => {
+    if (resetCountersQuestion == null) return;
+
+    await resetCountersMutation.mutateAsync(resetCountersQuestion.id);
+    setIsResetCountersDialogOpen(false);
   };
 
   const handleColorChange = (questionId: string, answerPosition: 1 | 2) => (color: string) => {
@@ -263,6 +301,13 @@ export const QuestionTable = () => {
                           aria-label="Bewerk vraag"
                         />
                         <IconButton
+                          icon={<RotateCcw className="h-4 w-4" />}
+                          variant="outline"
+                          onClick={() => handleResetCounters(question)}
+                          aria-label="Reset tellers"
+                        />
+                        <IconButton
+                          disabled={question.isActive}
                           icon={<TrashIcon className="h-4 w-4" />}
                           variant="destructive-outline"
                           onClick={() => handleDelete(question)}
@@ -308,6 +353,27 @@ export const QuestionTable = () => {
         itemName={deletingQuestion?.text || ''}
         onConfirm={confirmDelete}
       />
+
+      <Dialog open={isResetCountersDialogOpen} onOpenChange={setIsResetCountersDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Tellers resetten</DialogTitle>
+            <DialogDescription>
+              Weet je zeker dat je alle stemtellingen voor &ldquo;{resetCountersQuestion?.text}
+              &rdquo; wilt resetten? Alle tellingen worden op 0 gezet. Deze actie kan niet ongedaan
+              worden gemaakt.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsResetCountersDialogOpen(false)}>
+              Annuleren
+            </Button>
+            <Button variant="default" onClick={confirmResetCounters}>
+              Tellers resetten
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

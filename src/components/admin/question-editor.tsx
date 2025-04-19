@@ -1,3 +1,5 @@
+'use client';
+
 import { Button } from '@/components/ui/button';
 import { ColorPicker } from '@/components/ui/color-picker';
 import {
@@ -9,7 +11,17 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
+import { useForm } from 'react-hook-form';
+
+type QuestionFormValues = {
+  id?: string;
+  text: string;
+  answer1Text: string;
+  answer2Text: string;
+  answer1Color: string;
+  answer2Color: string;
+};
 
 interface QuestionEditorProps {
   open: boolean;
@@ -33,47 +45,59 @@ interface QuestionEditorProps {
 }
 
 export function QuestionEditor({ open, onOpenChange, question, onSave }: QuestionEditorProps) {
-  const [text, setText] = useState('');
-  const [answer1Text, setAnswer1Text] = useState('Ja');
-  const [answer2Text, setAnswer2Text] = useState('Nee');
-  const [answer1Color, setAnswer1Color] = useState('#0D9900');
-  const [answer2Color, setAnswer2Color] = useState('#D10000');
-  const [isSaving, setIsSaving] = useState(false);
+  const {
+    register,
+    handleSubmit,
+    setValue,
+    reset,
+    formState: { isSubmitting, errors },
+    watch,
+  } = useForm<QuestionFormValues>({
+    defaultValues: {
+      text: '',
+      answer1Text: 'Ja',
+      answer2Text: 'Nee',
+      answer1Color: '#0D9900',
+      answer2Color: '#D10000',
+    },
+  });
 
+  // Reset form when opening dialog
   useEffect(() => {
-    if (question) {
-      setText(question.text);
-      setAnswer1Text(question.answer1Text || 'Ja');
-      setAnswer2Text(question.answer2Text || 'Nee');
-      setAnswer1Color(question.answer1Color || '#0D9900');
-      setAnswer2Color(question.answer2Color || '#D10000');
-    } else {
-      setText('');
-      setAnswer1Text('Ja');
-      setAnswer2Text('Nee');
-      setAnswer1Color('#0D9900');
-      setAnswer2Color('#D10000');
+    if (open) {
+      if (question) {
+        // Edit existing question - populate form
+        reset({
+          id: question.id,
+          text: question.text,
+          answer1Text: question.answer1Text || 'Ja',
+          answer2Text: question.answer2Text || 'Nee',
+          answer1Color: question.answer1Color || '#0D9900',
+          answer2Color: question.answer2Color || '#D10000',
+        });
+      } else {
+        // New question - reset to defaults
+        reset({
+          id: undefined,
+          text: '',
+          answer1Text: 'Ja',
+          answer2Text: 'Nee',
+          answer1Color: '#0D9900',
+          answer2Color: '#D10000',
+        });
+      }
     }
-  }, [question]);
+  }, [open, question, reset]);
 
-  const handleSave = async () => {
-    if (!text.trim() || !answer1Text.trim() || !answer2Text.trim()) return;
+  const answer1Color = watch('answer1Color');
+  const answer2Color = watch('answer2Color');
 
-    setIsSaving(true);
+  const onSubmit = async (data: QuestionFormValues) => {
     try {
-      await onSave({
-        id: question?.id,
-        text,
-        answer1Text,
-        answer2Text,
-        answer1Color,
-        answer2Color,
-      });
+      await onSave(data);
       onOpenChange(false);
     } catch (error) {
       console.error('Error saving question:', error);
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -83,67 +107,79 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
         <DialogHeader>
           <DialogTitle>{question ? 'Vraag bewerken' : 'Nieuwe vraag'}</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="question-text" className="text-right">
+            <Label htmlFor="text" className="text-right">
               Vraag
             </Label>
-            <Input
-              id="question-text"
-              className="col-span-3"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="Vul de vraag in..."
-            />
+            <div className="col-span-3">
+              <Input
+                id="text"
+                {...register('text', { required: true })}
+                placeholder="Vul de vraag in..."
+              />
+              {errors.text && <p className="text-sm text-red-500 mt-1">{errors.text.message}</p>}
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="answer1-text" className="text-right">
+            <Label htmlFor="answer1Text" className="text-right">
               Antwoord 1
             </Label>
-            <Input
-              id="answer1-text"
-              className="col-span-2"
-              value={answer1Text}
-              onChange={(e) => setAnswer1Text(e.target.value)}
-              placeholder="Vul het eerste antwoord in..."
-            />
+            <div className="col-span-2">
+              <Input
+                id="answer1Text"
+                {...register('answer1Text', { required: true })}
+                placeholder="Vul het eerste antwoord in..."
+              />
+              {errors.answer1Text && (
+                <p className="text-sm text-red-500 mt-1">{errors.answer1Text.message}</p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
-              <Label htmlFor="answer1-color" className="sr-only">
+              <Label htmlFor="answer1Color" className="sr-only">
                 Kleur
               </Label>
-              <ColorPicker value={answer1Color} onChange={setAnswer1Color} className="h-8 w-8" />
+              <ColorPicker
+                value={answer1Color}
+                onChange={(value) => setValue('answer1Color', value)}
+                className="h-8 w-8"
+              />
             </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="answer2-text" className="text-right">
+            <Label htmlFor="answer2Text" className="text-right">
               Antwoord 2
             </Label>
-            <Input
-              id="answer2-text"
-              className="col-span-2"
-              value={answer2Text}
-              onChange={(e) => setAnswer2Text(e.target.value)}
-              placeholder="Vul het tweede antwoord in..."
-            />
+            <div className="col-span-2">
+              <Input
+                id="answer2Text"
+                {...register('answer2Text', { required: true })}
+                placeholder="Vul het tweede antwoord in..."
+              />
+              {errors.answer2Text && (
+                <p className="text-sm text-red-500 mt-1">{errors.answer2Text.message}</p>
+              )}
+            </div>
             <div className="flex items-center gap-2">
-              <Label htmlFor="answer2-color" className="sr-only">
+              <Label htmlFor="answer2Color" className="sr-only">
                 Kleur
               </Label>
-              <ColorPicker value={answer2Color} onChange={setAnswer2Color} className="h-8 w-8" />
+              <ColorPicker
+                value={answer2Color}
+                onChange={(value) => setValue('answer2Color', value)}
+                className="h-8 w-8"
+              />
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button
-            type="submit"
-            onClick={handleSave}
-            disabled={isSaving || !text.trim() || !answer1Text.trim() || !answer2Text.trim()}
-          >
-            {isSaving ? 'Bezig met opslaan...' : 'Opslaan'}
-          </Button>
-        </DialogFooter>
+
+          <DialogFooter>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? 'Bezig met opslaan...' : 'Opslaan'}
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

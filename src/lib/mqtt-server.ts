@@ -1,12 +1,11 @@
-import { mqttConfig } from '../config/mqtt';
-import { onCounterUpdate, getListenerCount } from '../lib/global-event-bus';
-import { setupMQTTClient, publishMessage, closeMQTTConnection } from './mqtt';
 import 'server-only';
+import { getListenerCount } from '../lib/global-event-bus';
+import { closeMQTTConnection, ensureMQTTClient, publishMessage } from './mqtt';
 
 // Create a singleton for the MQTT client
 let isInitialized = false;
 
-export function initMQTTClient() {
+export async function initMQTTClient() {
   if (isInitialized) {
     console.log('MQTT client already initialized, skipping...');
     return;
@@ -16,13 +15,8 @@ export function initMQTTClient() {
   console.log('Current event bus listener counts:', getListenerCount());
 
   // Setup MQTT client
-  setupMQTTClient(mqttConfig);
+  await ensureMQTTClient();
   isInitialized = true;
-
-  // Register test handler to verify global event emission
-  onCounterUpdate((data) => {
-    console.log('MQTT-SERVER TEST HANDLER received counterUpdate event:', data);
-  });
 
   // Handle graceful shutdown
   process.on('beforeExit', () => {
@@ -33,4 +27,4 @@ export function initMQTTClient() {
 }
 
 // Re-export functions for use in server components/routes
-export { publishMessage, closeMQTTConnection };
+export { closeMQTTConnection, publishMessage };

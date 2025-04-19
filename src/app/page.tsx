@@ -74,7 +74,7 @@ const VoteOption = ({ count, text, isAnimating, contentVariants }: VoteOptionPro
         <AnimatePresence mode="wait">
           <motion.span
             key={`text-${text}`}
-            className="text-5xl md:text-6xl font-bold text-gray-700"
+            className="text-4xl md:text-5xl font-bold text-gray-700"
             variants={contentVariants}
             initial="hidden"
             animate={isAnimating ? 'exit' : 'visible'}
@@ -347,7 +347,7 @@ export default function Home() {
               exit="exit"
               onAnimationComplete={handleAnimationComplete}
             >
-              <h1 className="text-3xl md:text-4xl font-bold text-center text-black leading-tight text-balance">
+              <h1 className="text-3xl md:text-5xl font-bold text-center text-black leading-13 text-balance">
                 {isLoading ? 'Laden...' : displayedQuestion}
               </h1>
             </motion.div>

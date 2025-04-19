@@ -6,6 +6,7 @@ import { eq } from 'drizzle-orm';
 import mqtt from 'mqtt';
 
 let mqttClient: mqtt.MqttClient | null = null;
+let isInitializing = false;
 
 // Log on module initialization
 console.log('MQTT module loaded');
@@ -17,8 +18,37 @@ interface MQTTConfig {
   password?: string;
 }
 
+// Ensure MQTT client is initialized
+export function ensureMQTTClient(): Promise<mqtt.MqttClient> {
+  if (mqttClient) {
+    return Promise.resolve(mqttClient);
+  }
+
+  if (isInitializing) {
+    // If already initializing, wait for it to complete
+    return new Promise((resolve) => {
+      const checkInterval = setInterval(() => {
+        if (mqttClient) {
+          clearInterval(checkInterval);
+          resolve(mqttClient);
+        }
+      }, 100);
+    });
+  }
+
+  // Start initialization
+  isInitializing = true;
+  return Promise.resolve(setupMQTTClient(mqttConfig));
+}
+
 // Setup MQTT client and listeners
 export function setupMQTTClient(config: MQTTConfig) {
+  // If client already exists, return it
+  if (mqttClient) {
+    isInitializing = false;
+    return mqttClient;
+  }
+
   const { broker, port, username, password } = config;
   const url = `mqtt://${broker}:${port}`;
 
@@ -33,6 +63,7 @@ export function setupMQTTClient(config: MQTTConfig) {
   // Handle connection
   mqttClient.on('connect', async () => {
     console.log('Connected to MQTT broker');
+    isInitializing = false;
 
     if (!mqttClient) {
       console.error('MQTT client not initialized');
@@ -106,59 +137,39 @@ export function setupMQTTClient(config: MQTTConfig) {
   // Handle errors
   mqttClient.on('error', (error) => {
     console.error('MQTT client error:', error);
+    isInitializing = false;
   });
 
   return mqttClient;
 }
 
 // Publish a message to the MQTT broker
-export function publishMessage(topic: string, message: string) {
-  if (!mqttClient) {
-    console.error('MQTT client not initialized');
-    return;
-  }
-
-  mqttClient.publish(topic, message, { qos: 0, retain: false });
+export async function publishMessage(topic: string, message: string) {
+  const client = await ensureMQTTClient();
+  client.publish(topic, message, { qos: 0, retain: false });
 }
 
 // Reset counters for the active question
-export async function resetCounters() {
-  if (!mqttClient) {
-    console.error('MQTT client not initialized');
-    return false;
-  }
-
+export async function resetCounters(questionId: string, count1?: number, count2?: number) {
   try {
-    // Find the active question
-    const activeQuestion = await db.query.questions.findFirst({
-      where: eq(questions.isActive, true),
-    });
+    // Ensure the MQTT client is initialized
+    await ensureMQTTClient();
 
-    if (!activeQuestion) {
-      console.error('No active question found');
-      return false;
-    }
-
-    // Update the database to reset both counters
-    await db
-      .update(questions)
-      .set({
-        answer1Count: 0,
-        answer2Count: 0,
-        updatedAt: new Date().toISOString(),
-      })
-      .where(eq(questions.id, activeQuestion.id));
+    const count1String = count1 ? count1.toString() : '0';
+    const count2String = count2 ? count2.toString() : '0';
 
     // Publish the reset to MQTT
-    publishMessage(mqttConfig.topics.setCounter1, '0');
-    publishMessage(mqttConfig.topics.setCounter2, '0');
+    await publishMessage(mqttConfig.topics.setCounter1, count1String);
+    await publishMessage(mqttConfig.topics.setCounter2, count2String);
+    await publishMessage(mqttConfig.topics.counter1, count1String);
+    await publishMessage(mqttConfig.topics.counter2, count2String);
 
     // Emit update through global event bus
-    const answer1Id = `${activeQuestion.id}_answer1`;
-    const answer2Id = `${activeQuestion.id}_answer2`;
+    const answer1Id = `${questionId}_answer1`;
+    const answer2Id = `${questionId}_answer2`;
 
-    emitCounterUpdate({ answerId: answer1Id, count: 0 });
-    emitCounterUpdate({ answerId: answer2Id, count: 0 });
+    emitCounterUpdate({ answerId: answer1Id, count: count1 ?? 0 });
+    emitCounterUpdate({ answerId: answer2Id, count: count2 ?? 0 });
 
     return true;
   } catch (error) {
@@ -172,5 +183,6 @@ export function closeMQTTConnection() {
   if (mqttClient) {
     mqttClient.end();
     mqttClient = null;
+    isInitializing = false;
   }
 }
