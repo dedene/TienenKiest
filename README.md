@@ -4,27 +4,29 @@ A real-time voting application built with Next.js, SQLite, and MQTT.
 
 ## Features
 
-- Admin interface to manage topics, questions, and answers
-- Real-time updates via WebSockets
+- Admin interface to manage questions and answers
+- Real-time updates via tRPC using SSE (requires modern browser, but no need for a separate
+  websocker server)
 - MQTT integration for receiving vote counts from external devices
 - SQLite database for persistent storage
-- Mobile-friendly responsive design
 
 ## Tech Stack
 
-- **Frontend**: Next.js, React, TypeScript, Tailwind CSS, Shadcn UI
-- **Backend**: Next.js API routes, custom server
+- **Frontend**: Next.js 15, React 19, TypeScript, Tailwind CSS 4, Shadcn UI
+- **Backend**: tRPC, Next.js App Router
 - **Database**: SQLite with Drizzle ORM
-- **Real-time**: Socket.IO for WebSockets
+- **Real-time**: tRPC observables for reactivity
 - **Communication**: MQTT for IoT integration
+- **State Management**: React Query, tRPC
 - **Styling**: Tailwind CSS, Framer Motion for animations
+- **Form Handling**: React Hook Form with Zod validation
 
 ## Getting Started
 
 ### Prerequisites
 
 - Node.js 18+
-- Yarn or npm
+- Yarn (recommended, v1.22+)
 - An MQTT broker (e.g., Mosquitto, HiveMQ)
 
 ### Installation
@@ -52,9 +54,6 @@ MQTT_BROKER=localhost
 MQTT_PORT=1883
 MQTT_USERNAME=your_username  # optional
 MQTT_PASSWORD=your_password  # optional
-
-# Socket.IO Configuration
-NEXT_PUBLIC_SOCKET_URL=http://localhost:3000  # optional, defaults to window.location.origin
 ```
 
 4. Start the development server:
@@ -70,41 +69,44 @@ yarn dev
 The application listens to the following MQTT topics:
 
 - `counter/{answerId}` - For receiving vote counts
-- `image/{answerId}` - For receiving image updates
 
 ## Project Structure
 
-- `/src/app` - Next.js App Router pages
-- `/src/components` - React components
-- `/src/lib` - Utility functions, database config, and MQTT client
+- `/src/app` - Next.js App Router pages and API routes
+- `/src/components` - React components (both server and client components)
+- `/src/lib` - Utility functions, database config, MQTT client, and global event bus
+- `/src/trpc` - tRPC routers, context, and observable server setup
+- `/src/config` - Application configuration
 - `/public` - Static assets and uploaded images
+- `/drizzle` - Database migrations
+
+## Database Schema
+
+The application uses a SQLite database with the following schema:
+
+- `questions` - Stores questions with embedded answers, vote counts, and colors
 
 ## Admin Interface
 
-The admin interface is available at `/admin` and provides the following functionality:
+The admin interface provides the following functionality:
 
-1. Topic Management
+1. Question Management
 
-   - Create, edit, and delete topics
-   - Set the active topic
+   - Create, edit, and delete questions
+   - Set active questions for voting
+   - Customize answer text and colors
 
-2. Question Management
-
-   - Add questions to topics
-   - Edit and delete questions
-
-3. Answer Management
-   - Add answers to questions
-   - Upload images for answers
+2. Answer Management
+   - View real-time vote counts
    - Reset vote counters
 
 ## Client Interface
 
-The client interface is available at the root URL `/` and shows:
+The client interface shows:
 
-- The active topic
-- Questions within the active topic
-- Answers for each question with real-time vote counts and percentages
+- Active questions for voting
+- Answers with real-time vote counts and visual feedback
+- Animated visualizations of voting results
 
 ## License
 
@@ -114,9 +116,12 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 
 - [Next.js](https://nextjs.org/)
 - [React](https://reactjs.org/)
+- [tRPC](https://trpc.io/)
 - [Tailwind CSS](https://tailwindcss.com/)
 - [Shadcn UI](https://ui.shadcn.com/)
-- [Socket.IO](https://socket.io/)
 - [MQTT.js](https://github.com/mqttjs/MQTT.js)
 - [Drizzle ORM](https://orm.drizzle.team/)
 - [SQLite](https://www.sqlite.org/)
+- [Framer Motion](https://www.framer.com/motion/)
+- [React Hook Form](https://react-hook-form.com/)
+- [Zod](https://zod.dev/)
