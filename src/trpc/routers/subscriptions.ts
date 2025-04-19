@@ -6,16 +6,8 @@ import {
   onActiveQuestion,
   offActiveQuestion,
   getListenerCount,
-  testEmitEvent,
 } from '@/lib/global-event-bus';
 import { eq } from 'drizzle-orm';
-
-// Log the global event bus state
-console.log('subscriptionsRouter - Checking global event bus listener counts:', getListenerCount());
-
-// Test event emission on module load
-testEmitEvent('subscriptions-router-init');
-console.log('Test event emitted from subscriptions router');
 
 export const subscriptionsRouter = createTRPCRouter({
   // Subscribe to counter updates

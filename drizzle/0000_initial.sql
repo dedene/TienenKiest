@@ -4,8 +4,10 @@ CREATE TABLE IF NOT EXISTS `questions` (
   `is_active` integer DEFAULT 0 NOT NULL,
   `answer1_text` text NOT NULL,
   `answer1_count` integer DEFAULT 0 NOT NULL,
+  `answer1_color` text NOT NULL,
   `answer2_text` text NOT NULL,
   `answer2_count` integer DEFAULT 0 NOT NULL,
+  `answer2_color` text NOT NULL,
   `created_at` text NOT NULL,
   `updated_at` text NOT NULL
 ); 

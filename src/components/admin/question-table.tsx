@@ -1,12 +1,11 @@
 'use client';
 
+import { QuestionEditor } from '@/components/admin/question-editor';
 import { DeleteConfirmation } from '@/components/delete-confirmation';
-import { QuestionEditor } from '@/components/question-editor';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { IconButton } from '@/components/ui/icon-button';
-import { Switch } from '@/components/ui/switch';
 import {
   Table,
   TableBody,
@@ -17,7 +16,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { trpc } from '@/lib/trpc';
-import { AlertCircle, PencilIcon, PlusCircle, TrashIcon } from 'lucide-react';
+import { AlertCircle, PencilIcon, PlusCircle, TrashIcon, Star, StarIcon } from 'lucide-react';
 import { useState } from 'react';
 
 export const QuestionTable = () => {
@@ -71,10 +70,10 @@ export const QuestionTable = () => {
     onSuccess: () => refetch(),
   });
 
-  const handleToggleActive = async (questionId: string, currentActive: boolean) => {
+  const handleActivate = async (questionId: string) => {
     toggleActiveMutation.mutate({
       id: questionId,
-      action: currentActive ? 'deactivate' : 'activate',
+      action: 'activate',
     });
   };
 
@@ -210,10 +209,18 @@ export const QuestionTable = () => {
                     </TableCell>
                     <TableCell className="text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <Switch
-                          checked={question.isActive}
-                          onCheckedChange={() => handleToggleActive(question.id, question.isActive)}
-                          aria-label={question.isActive ? 'Deactiveer vraag' : 'Activeer vraag'}
+                        <IconButton
+                          icon={
+                            question.isActive ? (
+                              <StarIcon className="h-4 w-4 text-yellow-400 fill-yellow-400" />
+                            ) : (
+                              <Star className="h-4 w-4" />
+                            )
+                          }
+                          onClick={() => handleActivate(question.id)}
+                          variant="outline"
+                          className={question.isActive ? 'bg-yellow-50' : ''}
+                          aria-label={question.isActive ? 'Actieve vraag' : 'Activeer vraag'}
                         />
                         <IconButton
                           icon={<PencilIcon className="h-4 w-4" />}

@@ -154,15 +154,25 @@ body {
   border: 3px solid #1e3a8a; /* blue-900 */
 }
 
-/* Vote option box style */
-.vote-option-box {
-  background-color: #9ca3af; /* gray-400 */
-  padding: 0.75rem;
-  text-align: center;
-  margin-bottom: 0.75rem;
-  border-radius: 0.25rem;
-  width: 90%;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+/*Down pointing*/
+.triangle-down {
+  width: 10%;
+  height: 0;
+  padding-left:10%;
+  padding-top: 10%;
+  overflow: hidden;
+}
+.triangle-down:after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 0;
+  margin-left:-500px;
+  margin-top:-500px;
+  
+  border-left: 500px solid transparent;
+  border-right: 500px solid transparent;
+  border-top: 500px solid #4679BD;
 }
 
 /* Gauge circle style */

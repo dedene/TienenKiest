@@ -1,6 +1,6 @@
 'use client';
 
-import { QuestionTable } from '@/components/admin/QuestionTable';
+import { QuestionTable } from '@/components/admin/question-table';
 
 export default function AdminPage() {
   return (

@@ -1,7 +1,23 @@
 'use client';
 
 import { trpc } from '@/lib/trpc';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useState, useEffect, useRef } from 'react';
+
+const ArrowDown = () => {
+  return (
+    <div className="">
+      <svg viewBox="0 0 75 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <path
+          fillRule="evenodd"
+          clipRule="evenodd"
+          d="M37.495 40L0 11.6335H14.1338V0H60.8662V11.6335H75L37.495 40Z"
+          fill="#98A1AE"
+        />
+      </svg>
+    </div>
+  );
+};
 
 export default function Home() {
   // Keep track of last data update time
@@ -26,7 +42,7 @@ export default function Home() {
 
   // State for tracking question changes
   const [lastQuestionId, setLastQuestionId] = useState<string | null>(null);
-  const [isFading, setIsFading] = useState(false);
+  const [isAnimating, setIsAnimating] = useState(false);
 
   // Subscribe to counter updates separately
   trpc.subscriptions.counterUpdates.useSubscription(undefined, {
@@ -60,17 +76,8 @@ export default function Home() {
           console.log('Refetched question data after change');
         });
 
-        setIsFading(true);
-
-        // After a short delay to allow fade out, update the displayed question data
-        setTimeout(() => {
-          updateDisplayedData(data);
-
-          // Then fade back in
-          setTimeout(() => {
-            setIsFading(false);
-          }, 100);
-        }, 400);
+        setIsAnimating(true);
+        updateDisplayedData(data);
       } else {
         // If it's just a counter update or the first load, update immediately
         updateDisplayedData(data);
@@ -117,21 +124,15 @@ export default function Home() {
 
         if (lastQuestionId) {
           // Use transition effect for question changes
-          setIsFading(true);
-          setTimeout(() => {
-            updateDisplayedData({
-              question: question.text,
-              answer1Text: question.answer1Text,
-              answer1Count: question.answer1Count,
-              answer2Text: question.answer2Text,
-              answer2Count: question.answer2Count,
-            });
-            setLastQuestionId(question.id);
-
-            setTimeout(() => {
-              setIsFading(false);
-            }, 100);
-          }, 400);
+          setIsAnimating(true);
+          updateDisplayedData({
+            question: question.text,
+            answer1Text: question.answer1Text,
+            answer1Count: question.answer1Count,
+            answer2Text: question.answer2Text,
+            answer2Count: question.answer2Count,
+          });
+          setLastQuestionId(question.id);
         } else {
           // First load, no transition
           updateDisplayedData({
@@ -171,6 +172,11 @@ export default function Home() {
     return () => clearInterval(interval);
   }, [refetchQuestion]);
 
+  // Animation complete handler
+  const handleAnimationComplete = () => {
+    setIsAnimating(false);
+  };
+
   // Format the question for display with line breaks at appropriate points
   const formatQuestion = () => {
     if (!displayedQuestion) return 'Laden...';
@@ -209,6 +215,19 @@ export default function Home() {
     );
   };
 
+  // Define animation variants
+  const contentVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: { duration: 0.4 },
+    },
+    exit: {
+      opacity: 0,
+      transition: { duration: 0.4 },
+    },
+  };
+
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-200">
       <div className="vote-card w-full max-w-[1200px] mx-auto">
@@ -218,37 +237,64 @@ export default function Home() {
         </div>
 
         {/* Main Question */}
-        <div
-          className={`bg-green-100 p-6 md:p-8 transition-opacity duration-300 ${
-            isFading ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
-          <h1 className="text-3xl md:text-4xl font-bold text-center text-black leading-tight">
-            {formatQuestion()}
-          </h1>
+        <div className="bg-green-100 p-6 md:p-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={displayedQuestion}
+              variants={contentVariants}
+              initial="hidden"
+              animate={isAnimating ? 'exit' : 'visible'}
+              exit="exit"
+              onAnimationComplete={handleAnimationComplete}
+            >
+              <h1 className="text-3xl md:text-4xl font-bold text-center text-black leading-tight">
+                {formatQuestion()}
+              </h1>
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Vote Counter and Options */}
-        <div className="flex flex-row">
+        <div className="flex flex-row bg-gray-300">
           {/* Left Option */}
-          <div
-            className={`flex-1 flex flex-col items-center p-4 gap-3 bg-gray-300 transition-opacity duration-300 ${
-              isFading ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            <div className="vote-option-box">
-              <span className="text-5xl md:text-6xl font-bold text-blue-600">{answer1Count}</span>
+          <div className="flex-1 flex flex-col items-center p-4 gap-3">
+            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={`left-count-${answer1Count}`}
+                  className="text-5xl md:text-6xl font-bold text-blue-600"
+                  variants={contentVariants}
+                  initial="hidden"
+                  animate={isAnimating ? 'exit' : 'visible'}
+                  exit="exit"
+                >
+                  {answer1Count}
+                </motion.span>
+              </AnimatePresence>
             </div>
-            <div className="vote-option-box">
-              <span className="text-5xl md:text-6xl font-bold text-blue-600">{answer1Text}</span>
+            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={`left-text-${answer1Text}`}
+                  className="text-5xl md:text-6xl font-bold text-blue-600"
+                  variants={contentVariants}
+                  initial="hidden"
+                  animate={isAnimating ? 'exit' : 'visible'}
+                  exit="exit"
+                >
+                  {answer1Text}
+                </motion.span>
+              </AnimatePresence>
             </div>
             <div className="w-full flex justify-center mt-2">
-              <div className="arrow-down w-4/5"></div>
+              <div className="w-full">
+                <ArrowDown />
+              </div>
             </div>
           </div>
 
           {/* Center Gauge */}
-          <div className="flex-1 flex items-center justify-center bg-gray-300 py-4">
+          <div className="flex-1 flex items-center justify-center py-4">
             <div className="gauge-circle">
               {/* Placeholder gauge markings */}
               <div className="gauge-marking absolute top-0 left-1/2 -translate-x-1/2 w-0.5 h-1/2"></div>
@@ -259,28 +305,54 @@ export default function Home() {
               <div className="absolute top-1 left-1 right-1 bottom-1/2 border-t-[12px] border-l-[12px] border-r-[12px] border-gray-400 rounded-t-full"></div>
 
               {/* Gauge needle */}
-              <div
-                className="gauge-needle transition-transform duration-1000"
-                style={{ transform: `translateX(-50%) rotate(${needleRotation}deg)` }}
-              ></div>
+              <motion.div
+                className="gauge-needle"
+                initial={{ rotate: 0 }}
+                animate={{ rotate: needleRotation }}
+                transition={{ duration: 1, type: 'spring', stiffness: 50 }}
+                style={{
+                  transformOrigin: 'bottom center',
+                  translateX: '-50%',
+                }}
+              ></motion.div>
               <div className="gauge-needle-pivot"></div>
             </div>
           </div>
 
           {/* Right Option */}
-          <div
-            className={`flex-1 flex flex-col items-center p-4 gap-3 bg-gray-300 transition-opacity duration-300 ${
-              isFading ? 'opacity-0' : 'opacity-100'
-            }`}
-          >
-            <div className="vote-option-box">
-              <span className="text-5xl md:text-6xl font-bold text-blue-600">{answer2Count}</span>
+          <div className="flex-1 flex flex-col items-center p-4 gap-3">
+            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={`right-count-${answer2Count}`}
+                  className="text-5xl md:text-6xl font-bold text-blue-600"
+                  variants={contentVariants}
+                  initial="hidden"
+                  animate={isAnimating ? 'exit' : 'visible'}
+                  exit="exit"
+                >
+                  {answer2Count}
+                </motion.span>
+              </AnimatePresence>
             </div>
-            <div className="vote-option-box">
-              <span className="text-5xl md:text-6xl font-bold text-blue-600">{answer2Text}</span>
+            <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+              <AnimatePresence mode="wait">
+                <motion.span
+                  key={`right-text-${answer2Text}`}
+                  className="text-5xl md:text-6xl font-bold text-blue-600"
+                  variants={contentVariants}
+                  initial="hidden"
+                  animate={isAnimating ? 'exit' : 'visible'}
+                  exit="exit"
+                >
+                  {answer2Text}
+                </motion.span>
+              </AnimatePresence>
             </div>
             <div className="w-full flex justify-center mt-2">
-              <div className="arrow-down w-4/5"></div>
+              <div className="w-full">
+                <ArrowDown />
+              </div>
             </div>
           </div>
         </div>
