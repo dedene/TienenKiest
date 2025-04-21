@@ -2,9 +2,14 @@
 
 import { trpc } from '@/lib/trpc';
 import { cn, DEFAULT_COLOR } from '@/lib/utils';
+import checkAnimation from '@/lottie/check.json';
+import nopeAnimation from '@/lottie/nope.json';
+import waitingAnimation from '@/lottie/waiting.json';
 import { motion, AnimatePresence } from 'framer-motion';
+import { flatten } from 'lottie-colorify';
+import Lottie from 'lottie-react';
 import localFont from 'next/font/local';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import GaugeComponent from 'react-gauge-component';
 
 const pixelfont = localFont({
@@ -72,6 +77,7 @@ const ArrowDown = ({ color }: { color: string }) => {
         <path
           fillRule="evenodd"
           clipRule="evenodd"
+          className="transition-all"
           d="M37.495 30L0 8.7251H14.1338V0H60.8662V8.7251H75L37.495 30Z"
           fill={color ?? '#98A1AE'}
         />
@@ -95,10 +101,61 @@ const SkeletonVoteOption = () => {
   );
 };
 
+const WaitingAnimation = ({ color }: { color: string }) => {
+  const lottieColor = useMemo(() => {
+    return getContrastColor(color);
+  }, [color]);
+
+  const animationData = useMemo(() => {
+    return flatten(lottieColor, waitingAnimation);
+  }, [lottieColor]);
+
+  return (
+    <div className="scale-160 translate-y-[-15px]">
+      <Lottie animationData={animationData} loop={true} />
+    </div>
+  );
+};
+
+const NopeAnimation = ({ color }: { color: string }) => {
+  const lottieColor = useMemo(() => {
+    return getContrastColor(color);
+  }, [color]);
+
+  const animationData = useMemo(() => {
+    return flatten(lottieColor, nopeAnimation);
+  }, [lottieColor]);
+
+  return (
+    <div className="scale-80 translate-y-[0px]">
+      <Lottie animationData={animationData} loop={true} />
+    </div>
+  );
+};
+
+const DetectedAnimation = ({ color }: { color: string }) => {
+  const lottieColor = useMemo(() => {
+    return getContrastColor(color);
+  }, [color]);
+
+  const animationData = useMemo(() => {
+    return flatten(lottieColor, checkAnimation);
+  }, [lottieColor]);
+
+  return (
+    <div className="scale-60 translate-y-[-5px]">
+      <Lottie animationData={animationData} loop={false} />
+    </div>
+  );
+};
+
 interface VoteOptionProps {
   count: number;
   text: string;
   isAnimating: boolean;
+  isProcessing?: boolean;
+  isDetected?: boolean;
+  isWrong?: boolean;
   contentVariants: {
     hidden: { opacity: number };
     visible: {
@@ -113,47 +170,82 @@ interface VoteOptionProps {
   color: string;
 }
 
-const VoteOption = ({ count, text, isAnimating, contentVariants, color }: VoteOptionProps) => {
+const VoteOption = ({
+  count,
+  isProcessing,
+  isDetected,
+  isWrong,
+  text,
+  isAnimating,
+  contentVariants,
+  color,
+}: VoteOptionProps) => {
+  // Memoize the contrast color and only update it when not animating
+  const [currentContrastColor, setCurrentContrastColor] = useState(() => getContrastColor(color));
+
+  // Update contrast color only when animation is complete or on initial render
+  useEffect(() => {
+    if (!isAnimating) {
+      setCurrentContrastColor(getContrastColor(color));
+    }
+  }, [color, isAnimating]);
+
   return (
     <div className="flex-1 flex flex-col items-center p-4 gap-3">
-      <div
-        className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
-        style={{ backgroundColor: color }}
-      >
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={`count-${count}`}
-            className="text-7xl font-bold"
-            style={{ color: getContrastColor(color) }}
-            variants={contentVariants}
-            initial="hidden"
-            animate={isAnimating ? 'exit' : 'visible'}
-            exit="exit"
+      {isProcessing || isWrong ? (
+        <div
+          className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-55 h-55 flex items-center justify-center transition-all"
+          style={{ backgroundColor: color }}
+        >
+          {isProcessing ? <WaitingAnimation color={color} /> : <NopeAnimation color={color} />}
+        </div>
+      ) : (
+        <>
+          <div
+            className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
+            style={{ backgroundColor: color }}
           >
-            {count}
-          </motion.span>
-        </AnimatePresence>
-      </div>
-      <div
-        className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
-        style={{ backgroundColor: color }}
-      >
-        <AnimatePresence mode="wait">
-          <motion.span
-            key={`text-${text}`}
-            className="text-6xl font-bold"
-            style={{ color: getContrastColor(color) }}
-            variants={contentVariants}
-            initial="hidden"
-            animate={isAnimating ? 'exit' : 'visible'}
-            exit="exit"
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={`count-${count}`}
+                className="text-7xl font-bold tracking-[2px]"
+                style={{ color: currentContrastColor }}
+                variants={contentVariants}
+                initial="hidden"
+                animate={isAnimating ? 'exit' : 'visible'}
+                exit="exit"
+              >
+                {count}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+          <div
+            className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
+            style={{ backgroundColor: color }}
           >
-            {text.toUpperCase()}
-          </motion.span>
-        </AnimatePresence>
-      </div>
+            <AnimatePresence mode="wait">
+              <motion.span
+                key={`text-${text}`}
+                className="text-6xl font-bold tracking-[2px]"
+                style={{ color: currentContrastColor }}
+                variants={contentVariants}
+                initial="hidden"
+                animate={isAnimating ? 'exit' : 'visible'}
+                exit="exit"
+              >
+                {text.toUpperCase()}
+              </motion.span>
+            </AnimatePresence>
+          </div>
+        </>
+      )}
       <div className="w-full flex justify-center mt-2">
-        <div className="w-full">
+        <div className="w-full relative">
+          {isDetected && (
+            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2">
+              <DetectedAnimation color={color} />
+            </div>
+          )}
           <ArrowDown color={color} />
         </div>
       </div>
@@ -195,6 +287,17 @@ export default function Home() {
   // State for tracking question changes
   const [lastQuestionId, setLastQuestionId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
+
+  // Memoize gauge pointer contrast color
+  const [gaugePointerColor, setGaugePointerColor] = useState('#000000');
+
+  // Update gauge pointer color only when animation is complete
+  useEffect(() => {
+    if (!isAnimating) {
+      const baseColor = gaugeValue < 50 ? answer1Color : answer2Color;
+      setGaugePointerColor(getContrastColor(baseColor));
+    }
+  }, [gaugeValue, answer1Color, answer2Color, isAnimating]);
 
   // Subscribe to counter updates separately
   trpc.subscriptions.counterUpdates.useSubscription(undefined, {
@@ -403,10 +506,10 @@ export default function Home() {
         pixelfont.className
       )}
     >
-      <div className="vote-card w-full mx-auto flex-grow flex flex-col">
+      <div className="vote-card w-full mx-auto flex-grow flex flex-col max-h-[800px]">
         {/* Header */}
         <div className="bg-gray-300 p-3 text-center border-b-2 border-blue-900">
-          <h2 className="text-xl md:text-3xl font-bold text-black uppercase">
+          <h2 className="text-xl md:text-3xl font-bold text-black uppercase tracking-[2px]">
             Stem met je sigarettenpeuk
           </h2>
         </div>
@@ -422,7 +525,7 @@ export default function Home() {
               exit="exit"
               onAnimationComplete={handleAnimationComplete}
             >
-              <h1 className="text-3xl md:text-6xl font-bold text-center text-black leading-13 text-balance uppercase">
+              <h1 className="text-3xl md:text-6xl font-bold text-center text-black leading-13 text-balance uppercase tracking-[4px]">
                 {isLoading ? 'Laden...' : displayedQuestion}
               </h1>
             </motion.div>
@@ -466,8 +569,8 @@ export default function Home() {
                     }}
                     pointer={{
                       type: 'needle',
-                      color: getContrastColor(gaugeValue < 50 ? answer1Color : answer2Color),
-                      baseColor: getContrastColor(gaugeValue < 50 ? answer1Color : answer2Color),
+                      color: '#464A4F',
+                      baseColor: '#464A4F',
                       length: 0.8,
                       width: 15,
                       animate: true,

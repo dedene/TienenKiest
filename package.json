@@ -35,6 +35,8 @@
     "dotenv": "^16.5.0",
     "drizzle-orm": "^0.42.0",
     "framer-motion": "^12.7.4",
+    "lottie-colorify": "^0.8.0",
+    "lottie-react": "^2.4.1",
     "lucide-react": "^0.501.0",
     "mqtt": "^5.11.0",
     "next": "15.3.1",
