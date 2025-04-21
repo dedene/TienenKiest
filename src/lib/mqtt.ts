@@ -107,6 +107,15 @@ export function setupMQTTClient(config: MQTTConfig) {
 
         console.log(`Found active question: ${activeQuestion.id}`);
 
+        // Check if the counter value has actually changed before updating
+        const currentValue =
+          answerPosition === '1' ? activeQuestion.answer1Count : activeQuestion.answer2Count;
+
+        if (currentValue === count) {
+          console.log(`Count value unchanged for answer ${answerPosition}, skipping update`);
+          return;
+        }
+
         // Update the counter in the database based on answer position
         const updateData = {
           updatedAt: new Date().toISOString(),

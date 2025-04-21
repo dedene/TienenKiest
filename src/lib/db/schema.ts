@@ -1,3 +1,4 @@
+import { DEFAULT_COLOR } from '../utils';
 import { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';
 
 // Questions table with embedded answers
@@ -9,12 +10,12 @@ export const questions = sqliteTable('questions', {
   // First answer (position 0)
   answer1Text: text('answer1_text').notNull(),
   answer1Count: integer('answer1_count').notNull().default(0),
-  answer1Color: text('answer1_color').notNull().default('#0D9900'),
+  answer1Color: text('answer1_color').notNull().default(DEFAULT_COLOR),
 
   // Second answer (position 1)
   answer2Text: text('answer2_text').notNull(),
   answer2Count: integer('answer2_count').notNull().default(0),
-  answer2Color: text('answer2_color').notNull().default('#D10000'),
+  answer2Color: text('answer2_color').notNull().default(DEFAULT_COLOR),
 
   createdAt: text('created_at')
     .notNull()

@@ -39,3 +39,5 @@ export function safeJsonParse<T>(json: string, fallback: T): T {
     return fallback;
   }
 }
+
+export const DEFAULT_COLOR = '#98a1ae';

@@ -1,4 +1,5 @@
 import { db } from '@/lib/db';
+import { Session } from 'next-auth';
 
 /**
  * Creates context for an incoming request
@@ -8,7 +9,7 @@ export const createContext = async () => {
   // For API routes, we use getServerSession directly in the route handler
   // This is primarily for client-side context creation
   return {
-    session: undefined,
+    session: undefined as Session | null | undefined,
     db,
   };
 };

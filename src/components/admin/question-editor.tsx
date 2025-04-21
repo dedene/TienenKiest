@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { DEFAULT_COLOR } from '@/lib/utils';
 import { useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 
@@ -72,8 +73,8 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
           text: question.text,
           answer1Text: question.answer1Text || 'Ja',
           answer2Text: question.answer2Text || 'Nee',
-          answer1Color: question.answer1Color || '#0D9900',
-          answer2Color: question.answer2Color || '#D10000',
+          answer1Color: question.answer1Color || DEFAULT_COLOR,
+          answer2Color: question.answer2Color || DEFAULT_COLOR,
         });
       } else {
         // New question - reset to defaults
@@ -82,8 +83,8 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
           text: '',
           answer1Text: 'Ja',
           answer2Text: 'Nee',
-          answer1Color: '#0D9900',
-          answer2Color: '#D10000',
+          answer1Color: DEFAULT_COLOR,
+          answer2Color: DEFAULT_COLOR,
         });
       }
     }

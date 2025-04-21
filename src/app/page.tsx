@@ -1,19 +1,79 @@
 'use client';
 
 import { trpc } from '@/lib/trpc';
+import { cn, DEFAULT_COLOR } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
+import localFont from 'next/font/local';
 import { useState, useEffect, useRef } from 'react';
 import GaugeComponent from 'react-gauge-component';
 
-const ArrowDown = () => {
+const pixelfont = localFont({
+  src: './pixelfont.ttf',
+});
+
+// Function to determine if text should be light or dark based on background color
+const getContrastColor = (hexColor: string): string => {
+  // Default to black if no color provided
+  if (!hexColor) return '#000000';
+
+  // Convert hex to RGB
+  let r = 0,
+    g = 0,
+    b = 0;
+
+  // 3 digits
+  if (hexColor.length === 4) {
+    r = parseInt(hexColor[1] + hexColor[1], 16);
+    g = parseInt(hexColor[2] + hexColor[2], 16);
+    b = parseInt(hexColor[3] + hexColor[3], 16);
+  }
+  // 6 digits
+  else if (hexColor.length === 7) {
+    r = parseInt(hexColor.slice(1, 3), 16);
+    g = parseInt(hexColor.slice(3, 5), 16);
+    b = parseInt(hexColor.slice(5, 7), 16);
+  }
+
+  // Calculate luminance (perceived brightness)
+  // Using the formula from WCAG 2.0
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  if (luminance > 0.5) {
+    // For light backgrounds, darken the color
+    const darkR = Math.max(0, Math.floor(r * 0.3))
+      .toString(16)
+      .padStart(2, '0');
+    const darkG = Math.max(0, Math.floor(g * 0.3))
+      .toString(16)
+      .padStart(2, '0');
+    const darkB = Math.max(0, Math.floor(b * 0.3))
+      .toString(16)
+      .padStart(2, '0');
+    return `#${darkR}${darkG}${darkB}`;
+  } else {
+    // For dark backgrounds, lighten the color
+    const lightR = Math.min(255, Math.floor(r + (255 - r) * 0.8))
+      .toString(16)
+      .padStart(2, '0');
+    const lightG = Math.min(255, Math.floor(g + (255 - g) * 0.8))
+      .toString(16)
+      .padStart(2, '0');
+    const lightB = Math.min(255, Math.floor(b + (255 - b) * 0.8))
+      .toString(16)
+      .padStart(2, '0');
+    return `#${lightR}${lightG}${lightB}`;
+  }
+};
+
+const ArrowDown = ({ color }: { color: string }) => {
   return (
     <div className="">
-      <svg viewBox="0 0 75 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <svg viewBox="0 0 75 30" fill="none" xmlns="http://www.w3.org/2000/svg">
         <path
           fillRule="evenodd"
           clipRule="evenodd"
-          d="M37.495 40L0 11.6335H14.1338V0H60.8662V11.6335H75L37.495 40Z"
-          fill="#98A1AE"
+          d="M37.495 30L0 8.7251H14.1338V0H60.8662V8.7251H75L37.495 30Z"
+          fill={color ?? '#98A1AE'}
         />
       </svg>
     </div>
@@ -28,7 +88,7 @@ const SkeletonVoteOption = () => {
       <div className="bg-gray-300 rounded-lg w-full h-16 animate-pulse" />
       <div className="w-full flex justify-center mt-2">
         <div className="w-full opacity-30">
-          <ArrowDown />
+          <ArrowDown color={DEFAULT_COLOR} />
         </div>
       </div>
     </div>
@@ -53,14 +113,18 @@ interface VoteOptionProps {
   color: string;
 }
 
-const VoteOption = ({ count, text, isAnimating, contentVariants }: VoteOptionProps) => {
+const VoteOption = ({ count, text, isAnimating, contentVariants, color }: VoteOptionProps) => {
   return (
     <div className="flex-1 flex flex-col items-center p-4 gap-3">
-      <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+      <div
+        className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
+        style={{ backgroundColor: color }}
+      >
         <AnimatePresence mode="wait">
           <motion.span
             key={`count-${count}`}
-            className="text-5xl md:text-6xl font-bold text-gray-700"
+            className="text-7xl font-bold"
+            style={{ color: getContrastColor(color) }}
             variants={contentVariants}
             initial="hidden"
             animate={isAnimating ? 'exit' : 'visible'}
@@ -70,23 +134,27 @@ const VoteOption = ({ count, text, isAnimating, contentVariants }: VoteOptionPro
           </motion.span>
         </AnimatePresence>
       </div>
-      <div className="bg-gray-400 rounded-lg w-full text-center p-3">
+      <div
+        className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-26 h-26 flex items-center justify-center transition-all"
+        style={{ backgroundColor: color }}
+      >
         <AnimatePresence mode="wait">
           <motion.span
             key={`text-${text}`}
-            className="text-4xl md:text-5xl font-bold text-gray-700"
+            className="text-6xl font-bold"
+            style={{ color: getContrastColor(color) }}
             variants={contentVariants}
             initial="hidden"
             animate={isAnimating ? 'exit' : 'visible'}
             exit="exit"
           >
-            {text}
+            {text.toUpperCase()}
           </motion.span>
         </AnimatePresence>
       </div>
       <div className="w-full flex justify-center mt-2">
         <div className="w-full">
-          <ArrowDown />
+          <ArrowDown color={color} />
         </div>
       </div>
     </div>
@@ -329,15 +397,22 @@ export default function Home() {
   };
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center p-4 bg-gray-200">
-      <div className="vote-card w-full max-w-[1200px] mx-auto">
+    <main
+      className={cn(
+        'flex min-h-screen flex-col items-center justify-center p-0 bg-gray-200',
+        pixelfont.className
+      )}
+    >
+      <div className="vote-card w-full mx-auto flex-grow flex flex-col">
         {/* Header */}
         <div className="bg-gray-300 p-3 text-center border-b-2 border-blue-900">
-          <h2 className="text-xl md:text-2xl font-bold text-black">Stem met je sigarettenpeuk</h2>
+          <h2 className="text-xl md:text-3xl font-bold text-black uppercase">
+            Stem met je sigarettenpeuk
+          </h2>
         </div>
 
         {/* Main Question */}
-        <div className="bg-green-100 p-6 md:p-8">
+        <div className="bg-green-100 p-6 md:p-8 flex flex-grow items-center justify-center">
           <AnimatePresence mode="wait">
             <motion.div
               key={displayedQuestion}
@@ -347,7 +422,7 @@ export default function Home() {
               exit="exit"
               onAnimationComplete={handleAnimationComplete}
             >
-              <h1 className="text-3xl md:text-5xl font-bold text-center text-black leading-13 text-balance">
+              <h1 className="text-3xl md:text-6xl font-bold text-center text-black leading-13 text-balance uppercase">
                 {isLoading ? 'Laden...' : displayedQuestion}
               </h1>
             </motion.div>
@@ -355,7 +430,7 @@ export default function Home() {
         </div>
 
         {/* Vote Counter and Options */}
-        <div className="flex flex-row bg-gray-300">
+        <div className="flex flex-row bg-gray-300 h-[433px]">
           {/* Left Option */}
           {isLoading ? (
             <SkeletonVoteOption />
@@ -373,9 +448,9 @@ export default function Home() {
           <div className="flex-1 flex justify-center py-4">
             <div className="w-full mx-auto">
               {isLoading ? (
-                <div className="h-28 bg-gray-300 rounded-full animate-pulse" />
+                <div className="h-55 bg-gray-300 rounded-full animate-pulse" />
               ) : (
-                <div className="bg-white/50 flex w-full h-full rounded-xl items-center justify-center">
+                <div className="bg-white/50 flex w-full h-55 rounded-xl items-center justify-center">
                   <GaugeComponent
                     id="gauge-component"
                     type="semicircle"
@@ -391,8 +466,8 @@ export default function Home() {
                     }}
                     pointer={{
                       type: 'needle',
-                      color: '#464A4F',
-                      baseColor: '#464A4F',
+                      color: getContrastColor(gaugeValue < 50 ? answer1Color : answer2Color),
+                      baseColor: getContrastColor(gaugeValue < 50 ? answer1Color : answer2Color),
                       length: 0.8,
                       width: 15,
                       animate: true,

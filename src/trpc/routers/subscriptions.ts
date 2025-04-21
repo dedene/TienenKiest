@@ -30,19 +30,21 @@ export const subscriptionsRouter = createTRPCRouter({
     onCounterUpdate(onCounterUpdateHandler);
     console.log('Subscription registered, current counts:', getListenerCount());
 
+    // Make sure to clean up listener on abort
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', () => {
+        console.log('Aborting counterUpdates subscription');
+        offCounterUpdate(onCounterUpdateHandler);
+        resolvePromise = null;
+      });
+    }
+
     try {
       // Keep subscription alive and yield updates when they come
       while (opts.signal && !opts.signal.aborted) {
         // Wait for next event using a promise
         const data = await new Promise<{ answerId: string; count: number }>((resolve) => {
           resolvePromise = resolve;
-
-          // Cleanup if aborted
-          if (opts.signal) {
-            opts.signal.addEventListener('abort', () => {
-              resolvePromise = null;
-            });
-          }
         });
 
         // Emit the update to the client
@@ -61,6 +63,64 @@ export const subscriptionsRouter = createTRPCRouter({
     console.log('Setting up activeQuestion subscription with global event bus');
     console.log('Current listener counts:', getListenerCount());
 
+    // Set up event handler with access to the resolve function
+    let resolvePromise:
+      | ((
+          data: {
+            id: string;
+            question: string;
+            answer1Text: string;
+            answer2Text: string;
+            answer1Count: number;
+            answer2Count: number;
+            answer1Color: string;
+            answer2Color: string;
+          } | null
+        ) => void)
+      | null = null;
+
+    const activeQuestionHandler = async (data: { questionId: string }) => {
+      console.log('Subscription received activeQuestion event:', data);
+
+      // Get the question data from the database
+      const question = await opts.ctx.db.query.questions.findFirst({
+        where: eq(questions.id, data.questionId),
+      });
+
+      if (question && resolvePromise) {
+        console.log('Found question, emitting update:', question);
+        resolvePromise({
+          id: question.id,
+          question: question.text,
+          answer1Text: question.answer1Text,
+          answer2Text: question.answer2Text,
+          answer1Count: question.answer1Count,
+          answer2Count: question.answer2Count,
+          answer1Color: question.answer1Color,
+          answer2Color: question.answer2Color,
+        });
+        resolvePromise = null;
+      } else {
+        console.log('No question found for ID:', data.questionId);
+        if (resolvePromise) {
+          resolvePromise(null);
+          resolvePromise = null;
+        }
+      }
+    };
+
+    // Register the handler with the global event bus
+    onActiveQuestion(activeQuestionHandler);
+
+    // Cleanup if aborted
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', () => {
+        console.log('Aborting activeQuestion subscription');
+        offActiveQuestion(activeQuestionHandler);
+        resolvePromise = null;
+      });
+    }
+
     try {
       while (opts.signal && !opts.signal.aborted) {
         // Wait for the next active question update
@@ -74,65 +134,7 @@ export const subscriptionsRouter = createTRPCRouter({
           answer1Color: string;
           answer2Color: string;
         } | null>((resolve) => {
-          // Set up event handler with access to the resolve function
-          let resolvePromise:
-            | ((
-                data: {
-                  id: string;
-                  question: string;
-                  answer1Text: string;
-                  answer2Text: string;
-                  answer1Count: number;
-                  answer2Count: number;
-                  answer1Color: string;
-                  answer2Color: string;
-                } | null
-              ) => void)
-            | null = resolve;
-
-          const activeQuestionHandler = async (data: { questionId: string }) => {
-            console.log('Subscription received activeQuestion event:', data);
-
-            // Get the question data from the database
-            const question = await opts.ctx.db.query.questions.findFirst({
-              where: eq(questions.id, data.questionId),
-            });
-
-            if (question) {
-              console.log('Found question, emitting update:', question);
-              if (resolvePromise) {
-                resolvePromise({
-                  id: question.id,
-                  question: question.text,
-                  answer1Text: question.answer1Text,
-                  answer2Text: question.answer2Text,
-                  answer1Count: question.answer1Count,
-                  answer2Count: question.answer2Count,
-                  answer1Color: question.answer1Color,
-                  answer2Color: question.answer2Color,
-                });
-                resolvePromise = null;
-              }
-            } else {
-              console.log('No question found for ID:', data.questionId);
-              if (resolvePromise) {
-                resolvePromise(null);
-                resolvePromise = null;
-              }
-            }
-          };
-
-          // Register the handler with the global event bus
-          onActiveQuestion(activeQuestionHandler);
-
-          // Cleanup if aborted
-          if (opts.signal) {
-            opts.signal.addEventListener('abort', () => {
-              console.log('Aborting activeQuestion subscription');
-              offActiveQuestion(activeQuestionHandler);
-              resolvePromise = null;
-            });
-          }
+          resolvePromise = resolve;
         });
 
         // Only yield if we got valid data
@@ -143,6 +145,7 @@ export const subscriptionsRouter = createTRPCRouter({
       }
     } finally {
       console.log('Cleaning up activeQuestion subscription');
+      offActiveQuestion(activeQuestionHandler);
     }
   }),
 });
