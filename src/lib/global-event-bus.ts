@@ -10,6 +10,11 @@ interface CounterUpdateEvent {
   count: number;
 }
 
+interface StatusUpdateEvent {
+  answerId: string;
+  status: number;
+}
+
 interface ActiveQuestionEvent {
   questionId: string;
 }
@@ -38,6 +43,7 @@ if (!global.appEventBus) {
 
 // Define event channels
 const COUNTER_UPDATE = 'counter:update';
+const STATUS_UPDATE = 'status:update';
 const ACTIVE_QUESTION = 'question:active';
 
 // Register diagnostic handler
@@ -61,6 +67,22 @@ export function offCounterUpdate(handler: (data: CounterUpdateEvent) => void): v
   global.appEventBus!.emitter.off(COUNTER_UPDATE, handler);
 }
 
+// Status update methods
+export function emitStatusUpdate(data: StatusUpdateEvent): void {
+  console.log('[EventEmitter] Emitting status update:', data);
+  global.appEventBus!.emitter.emit(STATUS_UPDATE, data);
+}
+
+export function onStatusUpdate(handler: (data: StatusUpdateEvent) => void): void {
+  console.log('[EventEmitter] Adding status update handler');
+  global.appEventBus!.emitter.on(STATUS_UPDATE, handler);
+}
+
+export function offStatusUpdate(handler: (data: StatusUpdateEvent) => void): void {
+  console.log('[EventEmitter] Removing status update handler');
+  global.appEventBus!.emitter.off(STATUS_UPDATE, handler);
+}
+
 // Active question methods
 export function emitActiveQuestion(data: ActiveQuestionEvent): void {
   console.log('[EventEmitter] Emitting active question:', data);
@@ -77,9 +99,14 @@ export function offActiveQuestion(handler: (data: ActiveQuestionEvent) => void):
   global.appEventBus!.emitter.off(ACTIVE_QUESTION, handler);
 }
 
-export function getListenerCount(): { counterUpdate: number; activeQuestion: number } {
+export function getListenerCount(): {
+  counterUpdate: number;
+  statusUpdate: number;
+  activeQuestion: number;
+} {
   return {
     counterUpdate: global.appEventBus!.emitter.listenerCount(COUNTER_UPDATE),
+    statusUpdate: global.appEventBus!.emitter.listenerCount(STATUS_UPDATE),
     activeQuestion: global.appEventBus!.emitter.listenerCount(ACTIVE_QUESTION),
   };
 }

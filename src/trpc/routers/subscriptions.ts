@@ -5,6 +5,8 @@ import {
   offCounterUpdate,
   onActiveQuestion,
   offActiveQuestion,
+  onStatusUpdate,
+  offStatusUpdate,
   getListenerCount,
 } from '@/lib/global-event-bus';
 import { eq } from 'drizzle-orm';
@@ -55,6 +57,54 @@ export const subscriptionsRouter = createTRPCRouter({
       // Cleanup when subscription ends
       console.log('Cleaning up counterUpdates subscription');
       offCounterUpdate(onCounterUpdateHandler);
+    }
+  }),
+
+  // Subscribe to status updates
+  statusUpdates: publicProcedure.subscription(async function* (opts) {
+    console.log('Setting up statusUpdates subscription on global event bus');
+    console.log('Current listener counts:', getListenerCount());
+
+    // Set up event handler with access to the resolve function
+    let resolvePromise: ((data: { answerId: string; status: number }) => void) | null = null;
+
+    const onStatusUpdateHandler = (data: { answerId: string; status: number }) => {
+      console.log('Subscription received statusUpdate event:', data);
+      if (resolvePromise) {
+        resolvePromise(data);
+        resolvePromise = null;
+      }
+    };
+
+    // Listen for status updates using the global event bus
+    onStatusUpdate(onStatusUpdateHandler);
+    console.log('Status subscription registered, current counts:', getListenerCount());
+
+    // Make sure to clean up listener on abort
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', () => {
+        console.log('Aborting statusUpdates subscription');
+        offStatusUpdate(onStatusUpdateHandler);
+        resolvePromise = null;
+      });
+    }
+
+    try {
+      // Keep subscription alive and yield updates when they come
+      while (opts.signal && !opts.signal.aborted) {
+        // Wait for next event using a promise
+        const data = await new Promise<{ answerId: string; status: number }>((resolve) => {
+          resolvePromise = resolve;
+        });
+
+        // Emit the update to the client
+        console.log('Yielding status update to client:', data);
+        yield data;
+      }
+    } finally {
+      // Cleanup when subscription ends
+      console.log('Cleaning up statusUpdates subscription');
+      offStatusUpdate(onStatusUpdateHandler);
     }
   }),
 

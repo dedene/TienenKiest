@@ -1,5 +1,5 @@
 import { mqttConfig } from '../config/mqtt';
-import { emitCounterUpdate } from '../lib/global-event-bus';
+import { emitCounterUpdate, emitStatusUpdate } from '../lib/global-event-bus';
 import { db } from './db';
 import { questions } from './db/schema';
 import { eq } from 'drizzle-orm';
@@ -73,6 +73,8 @@ export function setupMQTTClient(config: MQTTConfig) {
     // Subscribe to counter topics
     mqttClient.subscribe('counter/+', { qos: 0 });
     mqttClient.subscribe('image/+', { qos: 0 });
+    // Subscribe to status topics for vote options
+    mqttClient.subscribe('status/+', { qos: 0 });
   });
 
   // Handle messages
@@ -139,6 +141,57 @@ export function setupMQTTClient(config: MQTTConfig) {
         console.log('counterUpdate event emitted successfully');
       } catch (error) {
         console.error('Error processing counter update:', error);
+      }
+    }
+
+    // Handle status updates
+    if (topic.startsWith('status/')) {
+      const answerPosition = topic.split('/')[1];
+      if (!answerPosition || (answerPosition !== '1' && answerPosition !== '2')) {
+        console.log(`Invalid answer position: ${answerPosition}`);
+        return;
+      }
+
+      try {
+        const statusValue = parseInt(payload.toString(), 10);
+        if (isNaN(statusValue) || statusValue < 0 || statusValue > 3) {
+          console.log(`Invalid status value: ${payload.toString()}`);
+          return;
+        }
+
+        console.log(
+          `Processing status update for position ${answerPosition}, status: ${statusValue}`
+        );
+
+        // Find the active question
+        const activeQuestion = await db.query.questions.findFirst({
+          where: eq(questions.isActive, true),
+        });
+
+        if (!activeQuestion) {
+          console.error('No active question found');
+          return;
+        }
+
+        console.log(`Found active question: ${activeQuestion.id} for status update`);
+
+        // Create format for status update event
+        const answerId =
+          answerPosition === '1' ? `${activeQuestion.id}_answer1` : `${activeQuestion.id}_answer2`;
+
+        console.log(
+          `Emitting statusUpdate event with answerId: ${answerId}, status: ${statusValue}`
+        );
+
+        // Emit event through global event bus
+        emitStatusUpdate({
+          answerId,
+          status: statusValue,
+        });
+
+        console.log('statusUpdate event emitted successfully');
+      } catch (error) {
+        console.error('Error processing status update:', error);
       }
     }
   });

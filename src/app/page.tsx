@@ -111,7 +111,7 @@ const WaitingAnimation = ({ color }: { color: string }) => {
   }, [lottieColor]);
 
   return (
-    <div className="scale-160 translate-y-[-15px]">
+    <div className="scale-200 translate-y-[-25px] translate-x-[5px]">
       <Lottie animationData={animationData} loop={true} />
     </div>
   );
@@ -127,9 +127,17 @@ const NopeAnimation = ({ color }: { color: string }) => {
   }, [lottieColor]);
 
   return (
-    <div className="scale-80 translate-y-[0px]">
-      <Lottie animationData={animationData} loop={true} />
-    </div>
+    <>
+      <div
+        className="absolute top-[20px] w-full left-1/2 -translate-x-1/2 text-3xl font-bold uppercase tracking-[2px]"
+        style={{ color: lottieColor }}
+      >
+        Geen peuk herkend
+      </div>
+      <div className="scale-70 translate-y-[20px]">
+        <Lottie animationData={animationData} loop={true} />
+      </div>
+    </>
   );
 };
 
@@ -144,7 +152,7 @@ const DetectedAnimation = ({ color }: { color: string }) => {
 
   return (
     <div className="scale-60 translate-y-[-5px]">
-      <Lottie animationData={animationData} loop={false} />
+      <Lottie animationData={animationData} loop={1} />
     </div>
   );
 };
@@ -194,7 +202,7 @@ const VoteOption = ({
     <div className="flex-1 flex flex-col items-center p-4 gap-3">
       {isProcessing || isWrong ? (
         <div
-          className="bg-gray-400 rounded-lg w-full text-center pt-4 p-1 min-h-55 h-55 flex items-center justify-center transition-all"
+          className="bg-gray-400 relative rounded-lg w-full text-center pt-4 p-1 min-h-55 h-55 flex items-center justify-center transition-all"
           style={{ backgroundColor: color }}
         >
           {isProcessing ? <WaitingAnimation color={color} /> : <NopeAnimation color={color} />}
@@ -288,16 +296,9 @@ export default function Home() {
   const [lastQuestionId, setLastQuestionId] = useState<string | null>(null);
   const [isAnimating, setIsAnimating] = useState(false);
 
-  // Memoize gauge pointer contrast color
-  const [gaugePointerColor, setGaugePointerColor] = useState('#000000');
-
-  // Update gauge pointer color only when animation is complete
-  useEffect(() => {
-    if (!isAnimating) {
-      const baseColor = gaugeValue < 50 ? answer1Color : answer2Color;
-      setGaugePointerColor(getContrastColor(baseColor));
-    }
-  }, [gaugeValue, answer1Color, answer2Color, isAnimating]);
+  // State for vote option statuses
+  const [answer1Status, setAnswer1Status] = useState<number>(0);
+  const [answer2Status, setAnswer2Status] = useState<number>(0);
 
   // Subscribe to counter updates separately
   trpc.subscriptions.counterUpdates.useSubscription(undefined, {
@@ -313,6 +314,27 @@ export default function Home() {
     },
     onError: (error) => {
       console.error('Counter subscription error:', error);
+    },
+  });
+
+  // Subscribe to status updates
+  trpc.subscriptions.statusUpdates.useSubscription(undefined, {
+    onData: (data) => {
+      console.log('Received status update:', data);
+      lastUpdateTimeRef.current = Date.now();
+
+      // Check if this status update is for the current question
+      if (lastQuestionId && data.answerId.startsWith(lastQuestionId)) {
+        // Update the corresponding status
+        if (data.answerId.endsWith('answer1')) {
+          setAnswer1Status(data.status);
+        } else if (data.answerId.endsWith('answer2')) {
+          setAnswer2Status(data.status);
+        }
+      }
+    },
+    onError: (error) => {
+      console.error('Status subscription error:', error);
     },
   });
 
@@ -544,6 +566,9 @@ export default function Home() {
               isAnimating={isAnimating}
               contentVariants={contentVariants}
               color={answer1Color}
+              isProcessing={answer1Status === 1}
+              isDetected={answer1Status === 2}
+              isWrong={answer1Status === 3}
             />
           )}
 
@@ -597,6 +622,9 @@ export default function Home() {
               isAnimating={isAnimating}
               contentVariants={contentVariants}
               color={answer2Color}
+              isProcessing={answer2Status === 1}
+              isDetected={answer2Status === 2}
+              isWrong={answer2Status === 3}
             />
           )}
         </div>
