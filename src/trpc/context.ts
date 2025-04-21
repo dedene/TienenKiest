@@ -1,19 +1,14 @@
 import { db } from '@/lib/db';
-import type { CreateNextContextOptions } from '@trpc/server/adapters/next';
-import type { CreateWSSContextFnOptions } from '@trpc/server/adapters/ws';
-import { getSession } from 'next-auth/react';
 
 /**
  * Creates context for an incoming request
  * @see https://trpc.io/docs/v11/context
  */
-export const createContext = async (opts: CreateNextContextOptions | CreateWSSContextFnOptions) => {
-  const session = await getSession(opts);
-
-  console.log('createContext for', session?.user?.name ?? 'unknown user');
-
+export const createContext = async () => {
+  // For API routes, we use getServerSession directly in the route handler
+  // This is primarily for client-side context creation
   return {
-    session,
+    session: undefined,
     db,
   };
 };

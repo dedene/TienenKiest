@@ -34,9 +34,12 @@ import {
   StarIcon,
   RotateCcw,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 export const QuestionTable = () => {
+  const router = useRouter();
   const [editingQuestion, setEditingQuestion] = useState<{
     id: string;
     text: string;
@@ -76,25 +79,49 @@ export const QuestionTable = () => {
     },
   });
 
-  // tRPC mutations
+  // Handle authentication errors
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const handleAuthError = (error: any) => {
+    if (error.data?.code === 'UNAUTHORIZED') {
+      toast.error('Geen toegang: U moet ingelogd zijn als beheerder', {
+        description: 'U wordt doorgestuurd naar de inlogpagina',
+      });
+
+      // Redirect to login page
+      setTimeout(() => {
+        router.push('/admin/login');
+      }, 2000);
+    } else {
+      toast.error('Er is een fout opgetreden', {
+        description: error.message || 'Probeer het later opnieuw',
+      });
+    }
+  };
+
+  // tRPC mutations with auth error handling
   const toggleActiveMutation = trpc.questions.toggleActive.useMutation({
     onSuccess: () => refetch(),
+    onError: handleAuthError,
   });
 
   const createQuestionMutation = trpc.questions.create.useMutation({
     onSuccess: () => refetch(),
+    onError: handleAuthError,
   });
 
   const updateQuestionMutation = trpc.questions.update.useMutation({
     onSuccess: () => refetch(),
+    onError: handleAuthError,
   });
 
   const deleteQuestionMutation = trpc.questions.delete.useMutation({
     onSuccess: () => refetch(),
+    onError: handleAuthError,
   });
 
   const resetCountersMutation = trpc.questions.resetCounters.useMutation({
     onSuccess: () => refetch(),
+    onError: handleAuthError,
   });
 
   const handleActivate = async (questionId: string) => {

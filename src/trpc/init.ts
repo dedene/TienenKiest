@@ -46,19 +46,30 @@ export const publicProcedure = t.procedure;
 export const mergeRouters = t.mergeRouters;
 export const createCallerFactory = t.createCallerFactory;
 
+/**
+ * Protected procedure that requires the user to be authenticated as admin
+ * This middleware checks if the user is authenticated via NextAuth
+ * and throws an error if they are not
+ */
 export const authedProcedure = t.procedure.use(function isAuthed(opts) {
-  const user = opts.ctx.session?.user;
+  // Get the user from the session
+  const session = opts.ctx.session;
 
-  if (!user?.name) {
-    throw new TRPCError({ code: 'UNAUTHORIZED' });
+  // Verify the session exists and has a user
+  if (!session || !session.user || !session.user.name) {
+    throw new TRPCError({
+      code: 'UNAUTHORIZED',
+      message: 'You must be logged in as an admin to access this resource',
+    });
   }
 
+  // Continue with the authenticated user in context
   return opts.next({
     ctx: {
-      user: {
-        ...user,
-        name: user.name,
-      },
+      // Add the verified user to the context
+      user: session.user,
+      // Keep the original session
+      session,
     },
   });
 });

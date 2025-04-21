@@ -1,4 +1,4 @@
-import { publicProcedure, createTRPCRouter } from '../init';
+import { publicProcedure, createTRPCRouter, authedProcedure } from '../init';
 import { questions, NewQuestion } from '@/lib/db/schema';
 import { emitActiveQuestion } from '@/lib/global-event-bus';
 import { resetCounters as resetCountersMQTT } from '@/lib/mqtt';
@@ -33,7 +33,7 @@ export const questionsRouter = createTRPCRouter({
     }),
 
   // Create a new question
-  create: publicProcedure
+  create: authedProcedure
     .input(
       z.object({
         id: z.string().optional(),
@@ -79,7 +79,7 @@ export const questionsRouter = createTRPCRouter({
     }),
 
   // Update a question
-  update: publicProcedure
+  update: authedProcedure
     .input(
       z.object({
         id: z.string({ required_error: 'Question ID is required' }),
@@ -141,7 +141,7 @@ export const questionsRouter = createTRPCRouter({
     }),
 
   // Delete a question
-  delete: publicProcedure
+  delete: authedProcedure
     .input(
       z.object({
         id: z.string({ required_error: 'Question ID is required' }),
@@ -161,7 +161,7 @@ export const questionsRouter = createTRPCRouter({
     }),
 
   // Toggle question active status
-  toggleActive: publicProcedure
+  toggleActive: authedProcedure
     .input(
       z.object({
         id: z.string({ required_error: 'Question ID is required' }),
@@ -212,7 +212,7 @@ export const questionsRouter = createTRPCRouter({
     }),
 
   // Reset counters for the active question
-  resetCounters: publicProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
+  resetCounters: authedProcedure.input(z.string()).mutation(async ({ ctx, input }) => {
     const questionQuery = await ctx.db.select().from(questions).where(eq(questions.id, input));
     const question = questionQuery?.[0];
 
