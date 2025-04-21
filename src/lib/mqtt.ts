@@ -8,9 +8,6 @@ import mqtt from 'mqtt';
 let mqttClient: mqtt.MqttClient | null = null;
 let isInitializing = false;
 
-// Log on module initialization
-console.log('MQTT module loaded');
-
 interface MQTTConfig {
   broker: string;
   port: number;

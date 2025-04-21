@@ -5,6 +5,7 @@
  * They should be defined in the .env.local file.
  */
 
+import { isRuntimeExecution } from '@/lib/global-event-bus';
 import * as dotenv from 'dotenv';
 
 dotenv.config();
@@ -24,8 +25,10 @@ function validateEnvVariables() {
   }
 }
 
-// Validate environment variables during initialization
-validateEnvVariables();
+if (isRuntimeExecution) {
+  // Validate environment variables during initialization
+  validateEnvVariables();
+}
 
 export const mqttConfig = {
   broker: process.env.MQTT_BROKER || '',

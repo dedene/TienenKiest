@@ -64,6 +64,146 @@ yarn dev
 
 5. Open [http://localhost:3000](http://localhost:3000) in your browser to view the application.
 
+## Docker Deployment (Raspberry Pi)
+
+You can deploy this application to a Raspberry Pi (or any other environment) using Docker:
+
+### Prerequisites for Docker Deployment
+
+- Docker installed on your Raspberry Pi
+- A properly configured `.env` file with your environment variables
+
+### Environment Variables
+
+Create a `.env` file with the following variables:
+
+```
+# MQTT Configuration
+MQTT_BROKER=your_mqtt_broker_address
+MQTT_PORT=1883
+MQTT_USERNAME=your_username  # optional
+MQTT_PASSWORD=your_password  # optional
+
+# App Configuration
+NEXT_PUBLIC_APP_URL=http://your-raspberry-pi-ip:3000
+NEXT_PUBLIC_WS_URL=ws://your-raspberry-pi-ip:3001  # if applicable
+
+# Database Configuration
+SQLITE_DB_PATH=/app/data/sqlite.db  # This is the path inside the container
+```
+
+### Building and Running with Docker
+
+1. Build the Docker image for the Raspberry Pi4 architecture:
+
+```bash
+docker buildx build --platform linux/arm64/v8 -t dedene/tienen-kiest -f Dockerfile .
+```
+
+If you haven't set up buildx yet, you'll need to create and use a new builder instance first:
+
+```bash
+docker buildx create --name mybuilder --use
+docker buildx inspect --bootstrap
+```
+
+2. Create a directory for persistent data:
+
+```bash
+mkdir -p ./data
+```
+
+3. Copy your existing SQLite database to the data directory (if applicable):
+
+```bash
+cp sqlite.db ./data/
+```
+
+4. Run the Docker container:
+
+To run in foreground and view logs (i.e. while testing):
+
+```bash
+docker run --rm -it -p 3000:3000 -v "$(pwd)/data:/app/data" -v "$(pwd)/.env:/app/.env" dedene/tienen-kiest
+```
+
+```bash
+docker run -d --name tienen-kiest -p 3000:3000 -v "$(pwd)/data:/app/data" -v "$(pwd)/.env:/app/.env" --restart unless-stopped dedene/tienen-kiest
+```
+
+This command:
+
+- Maps port 3000 from the container to port 3000 on your host
+- Mounts your local `./data` directory to `/app/data` in the container (for SQLite persistence)
+- Mounts your `.env` file to the container for configuration
+- Sets the container to restart automatically unless manually stopped
+
+5. Access the application at `http://your-raspberry-pi-ip:3000`
+
+### Updating the Application
+
+To update to a new version:
+
+```bash
+# Stop and remove the old container
+docker stop tienen-kiest
+docker rm tienen-kiest
+
+# Pull the latest code and rebuild
+git pull
+docker build -t tienen-kiest .
+
+# Start a new container
+docker run -d \
+  --name tienen-kiest \
+  -p 3000:3000 \
+  -v "$(pwd)/data:/app/data" \
+  -v "$(pwd)/.env:/app/.env" \
+  --restart unless-stopped \
+  tienen-kiest
+```
+
+### Monitoring and Troubleshooting
+
+To view the logs from the Docker container:
+
+```bash
+# View all logs
+docker logs tienen-kiest
+
+# Follow logs in real-time
+docker logs -f tienen-kiest
+```
+
+To check the container status:
+
+```bash
+docker ps -a | grep tienen-kiest
+```
+
+If the container is not running or you encounter issues:
+
+1. Check if the database file is correctly mounted:
+
+   ```bash
+   docker exec -it tienen-kiest ls -la /app/data
+   ```
+
+2. Verify the environment variables are loaded:
+
+   ```bash
+   docker exec -it tienen-kiest printenv | grep MQTT
+   ```
+
+3. For persistent issues, try running the container in interactive mode:
+   ```bash
+   docker run -it --rm \
+     -p 3000:3000 \
+     -v "$(pwd)/data:/app/data" \
+     -v "$(pwd)/.env:/app/.env" \
+     tienen-kiest /bin/sh
+   ```
+
 ## MQTT Topics
 
 The application listens to the following MQTT topics:
