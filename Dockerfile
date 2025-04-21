@@ -33,6 +33,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 COPY --from=builder /app/drizzle ./drizzle
+COPY docker-entrypoint.sh ./
 
 # Create volume mount points
 VOLUME ["/app/data"]
@@ -44,6 +45,7 @@ ENV SQLITE_DB_PATH=/app/data/sqlite.db
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 RUN chown -R nodejs:nodejs /app
+RUN chmod +x /app/docker-entrypoint.sh
 USER nodejs
 
 # Create a directory for the .env file
@@ -56,5 +58,5 @@ EXPOSE 3000
 # Use tini as init process to handle signals properly
 ENTRYPOINT ["/sbin/tini", "--"]
 
-# Start the app with environment variables from mounted .env file
-CMD ["node", "server.js"]
+# Start the app with our custom entrypoint script
+CMD ["/app/docker-entrypoint.sh"]

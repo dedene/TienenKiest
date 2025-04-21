@@ -104,79 +104,87 @@ export function QuestionEditor({ open, onOpenChange, question, onSave }: Questio
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{question ? 'Vraag bewerken' : 'Nieuwe vraag'}</DialogTitle>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-xl">
+            {question ? 'Vraag bewerken' : 'Nieuwe vraag'}
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit(onSubmit)} className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="text" className="text-right">
-              Vraag
-            </Label>
-            <div className="col-span-3">
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <div className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="text" className="font-medium">
+                Vraag
+              </Label>
               <Input
                 id="text"
-                {...register('text', { required: true })}
+                {...register('text', { required: 'Vraag is verplicht' })}
                 placeholder="Vul de vraag in..."
+                className="w-full"
               />
-              {errors.text && <p className="text-sm text-red-500 mt-1">{errors.text.message}</p>}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="answer1Text" className="text-right">
-              Antwoord 1
-            </Label>
-            <div className="col-span-2">
-              <Input
-                id="answer1Text"
-                {...register('answer1Text', { required: true })}
-                placeholder="Vul het eerste antwoord in..."
-              />
-              {errors.answer1Text && (
-                <p className="text-sm text-red-500 mt-1">{errors.answer1Text.message}</p>
+              {errors.text && (
+                <p className="text-sm text-destructive mt-1">{errors.text.message}</p>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="answer1Color" className="sr-only">
-                Kleur
-              </Label>
-              <ColorPicker
-                value={answer1Color}
-                onChange={(value) => setValue('answer1Color', value)}
-                className="h-8 w-8"
-              />
+
+            <div className="grid grid-cols-[1fr_auto] gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="answer1Text" className="font-medium">
+                  Antwoord 1
+                </Label>
+                <Input
+                  id="answer1Text"
+                  {...register('answer1Text', { required: 'Antwoord 1 is verplicht' })}
+                  placeholder="Vul het eerste antwoord in..."
+                />
+                {errors.answer1Text && (
+                  <p className="text-sm text-destructive mt-1">{errors.answer1Text.message}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center justify-end pb-1">
+                <Label htmlFor="answer1Color" className="mb-2 text-sm text-muted-foreground">
+                  Kleur
+                </Label>
+                <ColorPicker
+                  value={answer1Color}
+                  onChange={(value) => setValue('answer1Color', value)}
+                  className="h-9 w-9 rounded-md border"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-[1fr_auto] gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="answer2Text" className="font-medium">
+                  Antwoord 2
+                </Label>
+                <Input
+                  id="answer2Text"
+                  {...register('answer2Text', { required: 'Antwoord 2 is verplicht' })}
+                  placeholder="Vul het tweede antwoord in..."
+                />
+                {errors.answer2Text && (
+                  <p className="text-sm text-destructive mt-1">{errors.answer2Text.message}</p>
+                )}
+              </div>
+
+              <div className="flex flex-col items-center justify-end pb-1">
+                <Label htmlFor="answer2Color" className="mb-2 text-sm text-muted-foreground">
+                  Kleur
+                </Label>
+                <ColorPicker
+                  value={answer2Color}
+                  onChange={(value) => setValue('answer2Color', value)}
+                  className="h-9 w-9 rounded-md border"
+                />
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="answer2Text" className="text-right">
-              Antwoord 2
-            </Label>
-            <div className="col-span-2">
-              <Input
-                id="answer2Text"
-                {...register('answer2Text', { required: true })}
-                placeholder="Vul het tweede antwoord in..."
-              />
-              {errors.answer2Text && (
-                <p className="text-sm text-red-500 mt-1">{errors.answer2Text.message}</p>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <Label htmlFor="answer2Color" className="sr-only">
-                Kleur
-              </Label>
-              <ColorPicker
-                value={answer2Color}
-                onChange={(value) => setValue('answer2Color', value)}
-                className="h-8 w-8"
-              />
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button type="submit" disabled={isSubmitting}>
+          <DialogFooter className="pt-2">
+            <Button type="submit" disabled={isSubmitting} className="w-full sm:w-auto">
               {isSubmitting ? 'Bezig met opslaan...' : 'Opslaan'}
             </Button>
           </DialogFooter>
